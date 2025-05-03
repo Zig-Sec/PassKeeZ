@@ -1,0 +1,199 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:b746eeba-4ba5-4cd7-92ab-a67b7a84ed2c",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2025-05-03T17:54:05 UTC",
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "manufacturer": {
+            "name": "Zig-Sec",
+            "url": [
+              "https://zigsec.org/"
+            ]
+          },
+          "name": "zat",
+          "externalReferences": [
+            {
+              "url": "https://github.com/Zig-Sec/zat",
+              "type": "vcs"
+            }
+          ]
+        }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "bom-ref": "dd1692d15d21a6f6@0.5.2",
+      "name": "passkeez",
+      "version": "0.5.2",
+      "purl": "pkg:github/Zig-Sec/PassKeeZ@0.5.2",
+      "externalReferences": [
+        {
+          "url": "git@github.com:Zig-Sec/PassKeeZ.git",
+          "type": "vcs"
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "65f99e6f07a316a0@0.10.0",
+      "name": "clap",
+      "version": "0.10.0",
+      "purl": "pkg:github/Hejsil/zig-clap@0.10.0",
+      "externalReferences": [
+        {
+          "url": "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.10.0.tar.gz",
+          "type": "vcs"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "c25aabcf9323b699@0.6.1",
+      "name": "keylib",
+      "version": "0.6.1",
+      "purl": "pkg:github/Zig-Sec/keylib@0.6.1",
+      "externalReferences": [
+        {
+          "url": "https://github.com/Zig-Sec/keylib/archive/refs/tags/0.6.1.tar.gz",
+          "type": "vcs"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "8ba83cc904d99578@0.1.2",
+      "name": "kdbx",
+      "version": "0.1.2",
+      "purl": "pkg:github/Zig-Sec/kdbx@0.1.2",
+      "externalReferences": [
+        {
+          "url": "https://github.com/Zig-Sec/kdbx/archive/refs/tags/0.1.2.tar.gz",
+          "type": "vcs"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "d17f50a6219ee8a0@0.3.0",
+      "name": "uuid",
+      "version": "0.3.0",
+      "purl": "pkg:github/r4gus/uuid-zig@0.3.0",
+      "externalReferences": [
+        {
+          "url": "https://github.com/r4gus/uuid-zig/archive/refs/tags/0.3.1.tar.gz",
+          "type": "vcs"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "32fbe7d2a082bf92@0.17.0",
+      "name": "zbor",
+      "version": "0.17.0",
+      "purl": "pkg:github/r4gus/zbor@0.17.0",
+      "externalReferences": [
+        {
+          "url": "https://github.com/r4gus/zbor/archive/refs/tags/0.17.2.tar.gz",
+          "type": "vcs"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "7a7a16eec9417569@2.0.0",
+      "name": "dishwasher",
+      "version": "2.0.0",
+      "purl": "pkg:github/edqx/dishwasher@2.0.0",
+      "externalReferences": [
+        {
+          "url": "https://github.com/edqx/dishwasher/archive/refs/tags/1.0.7.tar.gz",
+          "type": "vcs"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "e06b5c5f6286b39a@0.3.2",
+      "name": "ccdb",
+      "version": "0.3.2",
+      "purl": "pkg:github/r4gus/ccdb@0.3.2",
+      "externalReferences": [
+        {
+          "url": "https://github.com/r4gus/ccdb/archive/refs/tags/0.3.1.tar.gz",
+          "type": "vcs"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "274758e14a01bde3@0.15.0",
+      "name": "hidapi",
+      "version": "0.15.0",
+      "purl": "pkg:github/r4gus/hidapi@0.15.0",
+      "externalReferences": [
+        {
+          "url": "https://github.com/r4gus/hidapi/archive/refs/tags/0.15.0.tar.gz",
+          "type": "vcs"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "dd1692d15d21a6f6@0.5.2",
+      "dependsOn": [
+        "c25aabcf9323b699@0.6.1",
+        "8ba83cc904d99578@0.1.2",
+        "d17f50a6219ee8a0@0.3.0",
+        "e06b5c5f6286b39a@0.3.2"
+      ]
+    },
+    {
+      "ref": "65f99e6f07a316a0@0.10.0"
+    },
+    {
+      "ref": "c25aabcf9323b699@0.6.1",
+      "dependsOn": [
+        "32fbe7d2a082bf92@0.17.0",
+        "274758e14a01bde3@0.15.0",
+        "d17f50a6219ee8a0@0.3.0"
+      ]
+    },
+    {
+      "ref": "8ba83cc904d99578@0.1.2",
+      "dependsOn": [
+        "65f99e6f07a316a0@0.10.0",
+        "d17f50a6219ee8a0@0.3.0",
+        "7a7a16eec9417569@2.0.0"
+      ]
+    },
+    {
+      "ref": "d17f50a6219ee8a0@0.3.0"
+    },
+    {
+      "ref": "32fbe7d2a082bf92@0.17.0"
+    },
+    {
+      "ref": "7a7a16eec9417569@2.0.0"
+    },
+    {
+      "ref": "e06b5c5f6286b39a@0.3.2",
+      "dependsOn": [
+        "32fbe7d2a082bf92@0.17.0",
+        "d17f50a6219ee8a0@0.3.0",
+        "65f99e6f07a316a0@0.10.0"
+      ]
+    },
+    {
+      "ref": "274758e14a01bde3@0.15.0"
+    }
+  ]
+}
+
