@@ -1,8 +1,8 @@
 #!/bin/bash
 
-PASSKEEZ_VERSION=$([ -z "$1" ] && echo "0.5.1" || echo "$1")
-ZIGENITY_VERSION=$([ -z "$2" ] && echo "0.4.1" || echo "$2")
-ZIG_VERSION=$([ -z "$3" ] && echo "0.14.0" || echo "$3")
+PASSKEEZ_VERSION="0.5.2"
+ZIGENITY_VERSION="0.5.0"
+ZIG_VERSION="0.14.0"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -42,24 +42,6 @@ function download_zig {
     cd /tmp
     sub=$(ls | grep "zig-")
 
-    #if [ -z "$sub" ]; then
-    #    path=""
-    #    case $1 in
-    #        i386) path="https://ziglang.org/download/0.13.0/zig-linux-x86-0.13.0.tar.xz" ;;
-    #        i686) path="https://ziglang.org/download/0.13.0/zig-linux-x86-0.13.0.tar.xz" ;;
-    #        x86_64) path="https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz" ;;
-    #        *)
-    #            echo -e "${RED}Unsupported architecture $1. Exiting...${NC}"
-    #            exit 1
-    #            ;;
-    #    esac
-
-    #    if [ "$path" != "" ]; then
-    #        curl -# -C - -o "zig.tar.xz" "$path"
-    #        tar -xf "zig.tar.xz"
-    #        sub=$(ls | grep "zig-")
-    #    fi
-    #fi
     curl -# -C - -o "zig.tar.xz" "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-${ARCH}-${ZIG_VERSION}.tar.xz"
     tar -xf "zig.tar.xz"
     sub=$(ls | grep "zig-")
@@ -83,20 +65,6 @@ function check_dependencies {
             echo -e "${RED}Unknown package manager $1${NC}" 
             echo "Please make sure that the following dependencies are met:"
             echo "    * curl"
-            ;;
-    esac
-
-    case $2 in
-        x86_64)
-            ;;
-        aarch64)
-            ;;
-        *)
-            echo -e "${RED}unsupported architecture $2${NC}" 
-            echo "Supported architectures are:"
-            echo "    * x86_64"
-            echo "    * aarch64"
-            exit 1
             ;;
     esac
 
@@ -170,6 +138,53 @@ function postinst {
     udevadm control --reload-rules && udevadm trigger
 }
 
+MODE="Installer"
+
+POSITIONAL_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -u|--uninstall)
+            MODE="Uninstaller"
+            shift
+            ;;
+        --vpasskeez)
+            PASSKEEZ_VERSION="$2"
+            shift
+            shift
+            ;;
+        --vzig)
+            ZIG_VERSION="$2"
+            shift
+            shift
+            ;;
+        --vzigenity)
+            ZIGENITY_VERSION="$2"
+            shift
+            shift
+            ;;
+        -h|--help)
+            echo "usage: install-linux.sh [Option...]"
+            echo "  -u|--uninstall        uninstall PassKeeZ"
+            echo "  --vpasskeez           define the PassKeeZ version to install"
+            echo "  --vzigenity           define the zigenity version to install"
+            echo "  --vzig                define the Zig version to use for installation"
+            echo "  -h|--help             display this help message"
+            exit 1
+            ;;
+        -*|--*)
+            echo -e "{RED}Unknown option{NC} $1"  
+            exit 1
+            ;;
+        *)
+            POSITIONAL_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
 # Exit immediately if any command returns a non-zero exit status
 set -e
 
@@ -179,7 +194,7 @@ echo '| |_/ /_ _ ___ ___ | |/ /  ___  ___    / /'
 echo '|  __/ _` / __/ __||    \ / _ \/ _ \  / /'
 echo '| | | (_| \__ \__ \| |\  \  __/  __/./ /___'
 echo "\_|  \__,_|___/___/\_| \_/\___|\___|\_____/ v$PASSKEEZ_VERSION"
-echo -e "${GREEN}PassKeeZ Installer${NC}"
+echo -e "${GREEN}PassKeeZ ${MODE}${NC}"
 echo "------------------"
 
 if [ ! `id -u` = 0 ]; then
@@ -198,45 +213,56 @@ systemctl --user --machine=${SUDO_USER}@ stop passkeez.service || true
 echo "Disabling PassKeeZ service..."
 systemctl --user --machine=${SUDO_USER}@ disable passkeez.service || true
 
-echo "Checking dependencies... "
-check_dependencies $PKG $ARCH
+if [ "$MODE" = "Installer" ]; then
+    echo "Checking dependencies... "
+    check_dependencies $PKG $ARCH
 
-echo "Downloading Zig..."
-zig=$(download_zig)
-echo -e "${GREEN}OK${NC}"
+    echo "Downloading Zig..."
+    zig=$(download_zig)
+    echo -e "${GREEN}OK${NC}"
 
-echo "Installing PassKeeZ... "
-install_passkeez $zig
-echo -e "${GREEN}OK${NC}"
+    echo "Installing PassKeeZ... "
+    install_passkeez $zig
+    echo -e "${GREEN}OK${NC}"
 
-echo "Installing zigenity... "
-install_zigenity $zig
-echo -e "${GREEN}OK${NC}"
+    echo "Installing zigenity... "
+    install_zigenity $zig
+    echo -e "${GREEN}OK${NC}"
 
-echo "Checking configuration folder... "
-check_config_folder
-echo -e "${GREEN}OK${NC}"
+    echo "Checking configuration folder... "
+    check_config_folder
+    echo -e "${GREEN}OK${NC}"
 
-echo "Configuring... "
-postinst
-echo -e "${GREEN}OK${NC}"
+    echo "Configuring... "
+    postinst
+    echo -e "${GREEN}OK${NC}"
 
-echo "Enabling PassKeeZ service..."
-systemctl --user --machine=${SUDO_USER}@ enable passkeez.service || true
-echo "Starting PassKeeZ service..."
-systemctl --user --machine=${SUDO_USER}@ start passkeez.service || true
-systemctl --user --machine=${SUDO_USER}@ status --no-pager passkeez.service || true
+    echo "Enabling PassKeeZ service..."
+    systemctl --user --machine=${SUDO_USER}@ enable passkeez.service || true
+    echo "Starting PassKeeZ service..."
+    systemctl --user --machine=${SUDO_USER}@ start passkeez.service || true
+    systemctl --user --machine=${SUDO_USER}@ status --no-pager passkeez.service || true
 
-echo -e "${GREEN}PassKeeZ installed successfully.${NC}"
-echo "To enable PassKeeZ permanently you can run the following commands:"
-echo -e "    ${YELLOW}systemctl --user enable passkeez.service${NC}"
-echo -e "    ${YELLOW}systemctl --user start passkeez.service${NC}"
-echo "To stop PassKeeZ run:"
-echo -e "    ${YELLOW}systemctl --user stop passkeez.service${NC}"
-echo "To disable PassKeeZ run:"
-echo -e "    ${YELLOW}systemctl --user disable passkeez.service${NC}"
-echo "For further details visit https://github.com/Zig-Sec/PassKeeZ/wiki"
-echo -e "${YELLOW}If this is the first time running this script, please reboot...${NC}"
+    echo -e "${GREEN}PassKeeZ installed successfully.${NC}"
+    echo "To enable PassKeeZ permanently you can run the following commands:"
+    echo -e "    ${YELLOW}systemctl --user enable passkeez.service${NC}"
+    echo -e "    ${YELLOW}systemctl --user start passkeez.service${NC}"
+    echo "To stop PassKeeZ run:"
+    echo -e "    ${YELLOW}systemctl --user stop passkeez.service${NC}"
+    echo "To disable PassKeeZ run:"
+    echo -e "    ${YELLOW}systemctl --user disable passkeez.service${NC}"
+    echo "For further details visit https://github.com/Zig-Sec/PassKeeZ/wiki"
+    echo -e "${YELLOW}If this is the first time running this script, please reboot...${NC}"
+else
+    echo "Uninstalling PassKeeZ..."
+    echo -e "${YELLOW}removing${NC} passkeez"
+    rm /usr/local/bin/passkeez
+    echo -e "${YELLOW}removing${NC} passkeez.service"
+    rm "/home/${SUDO_USER}/.local/share/systemd/user/passkeez.service"
+    echo -e "${YELLOW}removing${NC} zigenity"
+    rm /usr/local/bin/zigenity
+    echo -e "${GREEN}uninstall successful${NC}"
+fi
 
 # Exit successfully
 exit 0
