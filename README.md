@@ -22,11 +22,11 @@ The project currently supports only Linux due to the absence of a standardized A
 ## Features
 
 * Works with all services that support Passkeys.
-* Store your Passkeys (just a private key + related data) in a local, encrypted database. Choose either the KDBX (KeePassXC, ...) or CCDB database format.
+* Store your Passkeys (just a private key + related data) in a local, encrypted database. 
 * Constant sign-counter, i.e. you can safely sync your credentials/passkeys between devices.
 
 > [!IMPORTANT]
-> KDBX support has been added with version 0.5.0. The advantage of using KDBX is that you can manage your passkeys using KeePass or KeePassXC (PassKeeZ uses the same format for storing passkeys as KeePassXC). If you run into issues please open an issue.
+> With the release of version 0.5.0, PassKeeZ uses the KDBX format for storing credentials. The advantage of using KDBX is that you can manage your passkeys using KeePass or KeePassXC (PassKeeZ uses the same format for storing passkeys as KeePassXC). If you run into issues please open an issue.
 
 ## Getting Started 
 
@@ -34,7 +34,7 @@ To get started please visit the [wiki](https://github.com/Zig-Sec/PassKeeZ/wiki/
 
 ### Database Management
 
-- KDBX: You can manage your `.kdbx` database with [KeePassXC](https://keepassxc.org/).
+- KDBX: You can manage your `.kdbx` database with [KeePassXC](https://keepassxc.org/) or KeePass.
 - CCDB: Currently the only way to manage your Credentials is by using the [CCDB command line application](https://github.com/r4gus/ccdb).
 
 ### File synchronization
