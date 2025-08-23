@@ -17,7 +17,7 @@
         },
         .kdbx = .{
             .url = "https://github.com/Zig-Sec/kdbx/archive/refs/tags/0.1.4.tar.gz",
-            .hash = "kdbx-0.1.4-eJXZBJG9CgDqY3mcSIxof3vyuZFTaxW2ZIDRPOiryWVw",
+            .hash = "kdbx-0.1.4-eJXZBMa7CgAIw7kG02QYyv1sFcePsjfoGH9-Ptl3wrTC",
         },
     },
     .paths = .{
@@ -28,5 +28,13 @@
         "script",
         "src",
         "static",
+    },
+    .licenses = .{
+        .{
+            .expression = "MIT",
+            .paths = .{
+                "",
+            },
+        },
     },
 }
