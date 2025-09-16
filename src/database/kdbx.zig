@@ -44,8 +44,7 @@ fn init(self: *TDatabase) TDatabase.Error!void {
     const mem = file.readToEndAlloc(self.allocator, 50_000_000) catch return error.FileError;
     defer self.allocator.free(mem);
 
-    var fbs = std.io.fixedBufferStream(mem);
-    const reader = fbs.reader();
+    var reader = std.Io.Reader.fixed(mem);
 
     const db = try self.allocator.create(kdbx.Database);
     errdefer self.allocator.destroy(db);
@@ -56,7 +55,7 @@ fn init(self: *TDatabase) TDatabase.Error!void {
     };
     defer db_key.deinit();
 
-    db.* = kdbx.Database.open(reader, .{
+    db.* = kdbx.Database.open(&reader, .{
         .allocator = self.allocator,
         .key = db_key,
     }) catch |e| {
@@ -69,7 +68,7 @@ fn init(self: *TDatabase) TDatabase.Error!void {
 
 fn deinit(self: *const TDatabase) void {
     if (self.db) |db| {
-        var db_ = @as(*kdbx.Database, @alignCast(@ptrCast(db)));
+        var db_ = @as(*kdbx.Database, @ptrCast(@alignCast(db)));
         db_.deinit();
     }
     self.allocator.free(self.path);
@@ -77,9 +76,9 @@ fn deinit(self: *const TDatabase) void {
 }
 
 fn save(self: *const TDatabase, a: std.mem.Allocator) TDatabase.Error!void {
-    var db = @as(*kdbx.Database, @alignCast(@ptrCast(self.db.?)));
+    var db = @as(*kdbx.Database, @ptrCast(@alignCast(self.db.?)));
 
-    var raw = std.ArrayList(u8).init(a);
+    var raw = std.Io.Writer.Allocating.init(a);
     defer raw.deinit();
 
     const db_key = kdbx.DatabaseKey{
@@ -89,7 +88,7 @@ fn save(self: *const TDatabase, a: std.mem.Allocator) TDatabase.Error!void {
     defer db_key.deinit();
 
     db.save(
-        raw.writer(),
+        &raw.writer,
         db_key,
         a,
     ) catch |e| {
@@ -97,7 +96,7 @@ fn save(self: *const TDatabase, a: std.mem.Allocator) TDatabase.Error!void {
         return error.DatabaseError;
     };
 
-    misc.writeFile(self.path, raw.items, a) catch |e| {
+    misc.writeFile(self.path, raw.written(), a) catch |e| {
         std.log.err("Cannot to save database: {any}", .{e});
         return error.DatabaseError;
     };
@@ -107,13 +106,13 @@ fn deleteCredential(
     self: *const TDatabase,
     urn: [36]u8,
 ) TDatabase.Error!void {
-    const db = @as(*kdbx.Database, @alignCast(@ptrCast(self.db.?)));
+    const db = @as(*kdbx.Database, @ptrCast(@alignCast(self.db.?)));
 
     const grp = db.body.root.getGroupByName("Passkeys") orelse return;
     const id = Uuid.urn.deserialize(&urn) catch return;
 
-    const e1 = grp.removeEntryByUuid(id);
-    if (e1) |e1_| e1_.deinit();
+    var e1 = grp.removeEntryByUuid(id);
+    if (e1) |*e1_| e1_.deinit();
 
     // persist data
     save(self, self.allocator) catch {
@@ -127,7 +126,7 @@ fn getCredential(
     rp_id_hash: ?[32]u8,
     idx: *usize,
 ) TDatabase.Error!Credential {
-    const db: *kdbx.Database = @as(*kdbx.Database, @alignCast(@ptrCast(self.db.?)));
+    const db: *kdbx.Database = @as(*kdbx.Database, @ptrCast(@alignCast(self.db.?)));
 
     const grp = db.body.root.getGroupByName("Passkeys") orelse return error.DatabaseError;
     while (grp.entries.items.len > idx.*) {
@@ -169,7 +168,7 @@ fn setCredential(
     self: *const TDatabase,
     data: Credential,
 ) TDatabase.Error!void {
-    const db: *kdbx.Database = @as(*kdbx.Database, @alignCast(@ptrCast(self.db.?)));
+    const db: *kdbx.Database = @as(*kdbx.Database, @ptrCast(@alignCast(self.db.?)));
 
     const grp = db.body.root.getGroupByName("Passkeys") orelse return error.DatabaseError;
     const id = Uuid.urn.deserialize(data.id.get()) catch {
@@ -187,8 +186,8 @@ fn setCredential(
         break :blk e;
     };
     errdefer {
-        const e_ = grp.removeEntryByUuid(id);
-        if (e_) |e__| e__.deinit();
+        var e_ = grp.removeEntryByUuid(id);
+        if (e_) |*e__| e__.deinit();
     }
 
     const pem_key = switch (data.key) {
@@ -203,12 +202,12 @@ fn setCredential(
     };
     defer self.allocator.free(pem_key);
 
-    try e.setKeePassXCPasskeyValues(
+    e.setKeePassXCPasskeyValues(
         data.rp.id.get(),
         if (data.user.name) |name| name.get() else "",
         data.user.id.get(),
         pem_key,
-    );
+    ) catch return TDatabase.Error.DatabaseError;
 
     // persist data
     save(self, self.allocator) catch {
@@ -326,11 +325,11 @@ pub fn createDialog(allocator: std.mem.Allocator, path: []const u8) !std.fs.File
                 };
                 defer db_key.deinit();
 
-                var raw = std.ArrayList(u8).init(allocator);
+                var raw = std.Io.Writer.Allocating.init(allocator);
                 defer raw.deinit();
 
                 database.save(
-                    raw.writer(),
+                    &raw.writer,
                     db_key,
                     allocator,
                 ) catch |e| {
@@ -338,7 +337,8 @@ pub fn createDialog(allocator: std.mem.Allocator, path: []const u8) !std.fs.File
                     return error.DatabaseError;
                 };
 
-                f_db.writer().writeAll(raw.items) catch |e| {
+                var writer = f_db.writer(&.{}).interface;
+                writer.writeAll(raw.written()) catch |e| {
                     std.log.err("Cannot write to database: {any}", .{e});
                     return error.DatabaseError;
                 };

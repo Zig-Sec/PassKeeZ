@@ -182,7 +182,13 @@ pub fn main() !void {
                 }
             }
         }
-        std.time.sleep(10000000);
+        var timer = std.time.Timer.start() catch {
+            std.log.err("failed to start timer in main", .{});
+            continue;
+        };
+        while (timer.read() < 10000000) {
+            std.mem.doNotOptimizeAway(void);
+        }
     }
 }
 
@@ -394,7 +400,7 @@ pub fn my_write(
 
 pub fn my_delete(
     id: [*c]const u8,
-) callconv(.C) Error {
+) callconv(.c) Error {
     _ = id;
     // TODO: remove this from keylib!
 

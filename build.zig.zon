@@ -1,23 +1,21 @@
 .{
     .name = .passkeez,
     .version = "0.5.3",
+    .minimum_zig_version = "0.15.1",
     .fingerprint = 0xdd1692d15d21a6f6,
     .dependencies = .{
         .keylib = .{
-            .url = "https://github.com/Zig-Sec/keylib/archive/refs/tags/0.6.1.tar.gz",
-            .hash = "keylib-0.6.1-mbYjk9-WCQBOqB9oq2ZqWQFeWI2HwuBEuPgL-wkJDHTg",
+            .url = "https://github.com/Zig-Sec/keylib/archive/refs/tags/0.7.0.tar.gz",
+            .hash = "keylib-0.7.0-mbYjk6qaCQACutrMpyhgstSmYxSKmcuRmLI-CJSumBeA",
         },
         .uuid = .{
-            .url = "https://github.com/r4gus/uuid-zig/archive/refs/tags/0.3.1.tar.gz",
-            .hash = "uuid-0.3.0-oOieIYF1AAA_BtE7FvVqqTn5uEYTvvz7ycuVnalCOf8C",
-        },
-        .ccdb = .{
-            .url = "https://github.com/r4gus/ccdb/archive/refs/tags/0.3.1.tar.gz",
-            .hash = "ccdb-0.3.2-mrOGYn4KDgC0cJl4CKpKaJB95wwIlHegHLV7NSbMYXu0",
+            .url = "https://github.com/r4gus/uuid-zig/archive/refs/tags/0.4.0.tar.gz",
+            .hash = "uuid-0.4.0-oOieIR2AAAChAUVBY4ABjYI1XN0EbVALmiN0JIlggC3i",
         },
         .kdbx = .{
-            .url = "https://github.com/Zig-Sec/kdbx/archive/refs/tags/0.1.4.tar.gz",
-            .hash = "kdbx-0.1.4-eJXZBMa7CgAIw7kG02QYyv1sFcePsjfoGH9-Ptl3wrTC",
+            //.url = "https://github.com/Zig-Sec/kdbx/archive/refs/tags/0.2.0.tar.gz",
+            //.hash = "kdbx-0.2.0-eJXZBNecEgC8JhA9_2_EfGy-4cvbEDQAITLXyrxdKACv",
+            .path = "../kdbx",
         },
     },
     .paths = .{
@@ -28,13 +26,5 @@
         "script",
         "src",
         "static",
-    },
-    .licenses = .{
-        .{
-            .expression = "MIT",
-            .paths = .{
-                "",
-            },
-        },
     },
 }

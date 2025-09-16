@@ -35,13 +35,13 @@ pub fn create(a: std.mem.Allocator) !void {
     var file = try home_dir.createFile(".passkeez/config.json", .{ .exclusive = true });
     defer file.close();
 
-    var str = std.ArrayList(u8).init(a);
+    var str = std.Io.Writer.Allocating.init(a);
     defer str.deinit();
 
     const x = @This(){};
-    try std.json.stringify(x, .{}, str.writer());
+    try std.json.Stringify.value(x, .{}, &str.writer);
 
-    try file.writeAll(str.items);
+    try file.writeAll(str.written());
 }
 
 pub fn deinit(self: *const @This(), a: std.mem.Allocator) void {

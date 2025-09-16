@@ -9,11 +9,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const ccdb_dep = b.dependency("ccdb", .{
-        .target = target,
-        .optimize = optimize,
-    });
-
     const kdbx_dep = b.dependency("kdbx", .{
         .target = target,
         .optimize = optimize,
@@ -26,16 +21,19 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "passkeez",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .root_source_file = b.path("src/main.zig"),
+            .imports = &.{
+                .{ .name = "keylib", .module = keylib_dep.module("keylib") },
+                .{ .name = "uhid", .module = keylib_dep.module("uhid") },
+                .{ .name = "zbor", .module = keylib_dep.module("zbor") },
+                .{ .name = "kdbx", .module = kdbx_dep.module("kdbx") },
+                .{ .name = "uuid", .module = uuid_dep.module("uuid") },
+            },
+        }),
     });
-    exe.root_module.addImport("keylib", keylib_dep.module("keylib"));
-    exe.root_module.addImport("uhid", keylib_dep.module("uhid"));
-    exe.root_module.addImport("zbor", keylib_dep.module("zbor"));
-    exe.root_module.addImport("ccdb", ccdb_dep.module("ccdb"));
-    exe.root_module.addImport("kdbx", kdbx_dep.module("kdbx"));
-    exe.root_module.addImport("uuid", uuid_dep.module("uuid"));
     exe.linkLibC();
 
     b.installArtifact(exe);
