@@ -13,9 +13,8 @@
             .hash = "uuid-0.4.0-oOieIR2AAAChAUVBY4ABjYI1XN0EbVALmiN0JIlggC3i",
         },
         .kdbx = .{
-            //.url = "https://github.com/Zig-Sec/kdbx/archive/refs/tags/0.2.0.tar.gz",
-            //.hash = "kdbx-0.2.0-eJXZBNecEgC8JhA9_2_EfGy-4cvbEDQAITLXyrxdKACv",
-            .path = "../kdbx",
+            .url = "https://github.com/Zig-Sec/kdbx/archive/refs/tags/0.2.1.tar.gz",
+            .hash = "kdbx-0.2.0-eJXZBIihEgAl-5saSWpBoU8rVPLYgp_4SwVmMchYo-gC",
         },
     },
     .paths = .{

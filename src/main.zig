@@ -23,6 +23,10 @@ var fetch_rp: ?dt.ABS128T = null;
 var fetch_hash: ?[32]u8 = null;
 var fetch_ts: ?i64 = null;
 
+pub const std_options: std.Options = .{
+    .log_level = .warn,
+};
+
 pub fn main() !void {
     State.init(allocator) catch |e| {
         std.log.err("Unable to initialize application ({any})", .{e});

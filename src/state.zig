@@ -101,7 +101,7 @@ pub fn authenticate(a: std.mem.Allocator) !void {
             @memset(password.stderr, 0);
             a.free(password.stderr);
         }
-        std.log.info("{any}", .{password});
+        //std.debug.print("{any}", .{password});
 
         switch (password.term.Exited) {
             0 => {

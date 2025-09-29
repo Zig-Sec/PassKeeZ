@@ -266,7 +266,7 @@ pub fn createDialog(allocator: std.mem.Allocator, path: []const u8) !std.fs.File
 
         switch (r2.term.Exited) {
             0 => {
-                std.log.info("{s}", .{r2.stdout});
+                //std.debug.print("{s}", .{r2.stdout});
                 const pw1 = r2.stdout[0 .. r2.stdout.len - 1];
 
                 if (pw1.len < 8) {
