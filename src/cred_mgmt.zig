@@ -11,17 +11,17 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 pub fn authenticatorCredentialManagement(
     auth: *keylib.ctap.authenticator.Auth,
     request: []const u8,
-    out: *std.ArrayList(u8),
+    out: *std.Io.Writer,
 ) keylib.ctap.StatusCodes {
     const S = struct {
         const max = 1000;
         var i: i64 = 0;
-        var rps: ?std.ArrayList(keylib.common.RelyingParty) = null;
+        var rps: ?std.ArrayListUnmanaged(keylib.common.RelyingParty) = null;
         const allocator = gpa.allocator();
 
         pub fn deinitRps() void {
-            if (rps) |_rps| {
-                _rps.deinit();
+            if (rps) |*_rps| {
+                _rps.deinit(allocator);
             }
             rps = null;
         }
@@ -66,7 +66,7 @@ pub fn authenticatorCredentialManagement(
 
     if (status != .ctap1_err_success) return status;
 
-    cbor.stringify(res, .{}, out.writer()) catch {
+    cbor.stringify(res, .{}, out) catch {
         std.log.err("credentialManagement: cbor encoding error", .{});
         return keylib.ctap.StatusCodes.ctap1_err_other;
     };
@@ -106,8 +106,8 @@ pub fn enumerateRPsBegin(auth: *keylib.ctap.authenticator.Auth, req: *const Requ
     };
 
     state.deinitRps();
-    state.rps = std.ArrayList(keylib.common.RelyingParty).init(state.allocator);
-    state.rps.?.append(cred.rp) catch {
+    state.rps = .empty;
+    state.rps.?.append(state.allocator, cred.rp) catch {
         state.deinitRps();
         status.* = .ctap1_err_other;
         return .{};
@@ -124,7 +124,7 @@ pub fn enumerateRPsBegin(auth: *keylib.ctap.authenticator.Auth, req: *const Requ
             if (std.mem.eql(u8, rp.id.get(), rp2.id.get())) continue :outer;
         }
 
-        state.rps.?.append(rp) catch {
+        state.rps.?.append(state.allocator, rp) catch {
             state.deinitRps();
             status.* = .ctap1_err_other;
             return .{};
@@ -219,22 +219,22 @@ pub fn enumerateCredentialsBegin(auth: *keylib.ctap.authenticator.Auth, req: *co
         return .{};
     }
 
-    var m = std.ArrayList(u8).init(state.allocator);
+    var m = std.Io.Writer.Allocating.init(state.allocator);
     defer m.deinit();
-    m.append(0x04) catch {
+    m.writer.writeByte(0x04) catch {
         status.* = .ctap1_err_other;
         return .{};
     };
     cbor.stringify(
         req.subCommandParams.?,
         .{},
-        m.writer(),
+        &m.writer,
     ) catch {
         status.* = .ctap1_err_other;
         return .{};
     };
 
-    if (!auth.token.verify_token(m.items, req.pinUvAuthParam.?.get())) {
+    if (!auth.token.verify_token(m.written(), req.pinUvAuthParam.?.get())) {
         status.* = .ctap2_err_pin_auth_invalid;
         return .{};
     }
@@ -319,22 +319,22 @@ pub fn deleteCredential(auth: *keylib.ctap.authenticator.Auth, req: *const Reque
         return .{};
     }
 
-    var m = std.ArrayList(u8).init(state.allocator);
+    var m = std.Io.Writer.Allocating.init(state.allocator);
     defer m.deinit();
-    m.append(0x06) catch {
+    m.writer.writeByte(0x06) catch {
         status.* = .ctap1_err_other;
         return .{};
     };
     cbor.stringify(
         req.subCommandParams.?,
         .{},
-        m.writer(),
+        &m.writer,
     ) catch {
         status.* = .ctap1_err_other;
         return .{};
     };
 
-    if (!auth.token.verify_token(m.items, req.pinUvAuthParam.?.get())) {
+    if (!auth.token.verify_token(m.written(), req.pinUvAuthParam.?.get())) {
         status.* = .ctap2_err_pin_auth_invalid;
         return .{};
     }

@@ -1,5 +1,4 @@
 const std = @import("std");
-const ccdb = @import("ccdb");
 const Database = @import("Database.zig");
 const Config = @import("database/Config.zig");
 const keylib = @import("keylib");
@@ -63,10 +62,8 @@ pub fn authenticate(a: std.mem.Allocator) !void {
     const f = misc.openFile(conf.db_path) catch |e| blk: {
         if (e != error.WouldBlock) {
             if (std.mem.containsAtLeast(u8, conf.db_path, 1, ".ccdb")) {
-                break :blk Database.ccdb.createDialog(a, conf.db_path) catch |e_| {
-                    std.log.err("unable to create database '{s}' ({any})", .{ conf.db_path, e });
-                    return e_;
-                };
+                std.log.err("Databases of the format '.ccdb' are deprecated. Please check your config or use an earlier version of PassKeeZ.", .{});
+                return error.DeprecatedDatabaseFormat;
             } else if (std.mem.containsAtLeast(u8, conf.db_path, 1, ".kdbx")) {
                 break :blk Database.kdbx.createDialog(a, conf.db_path) catch |e_| {
                     std.log.err("unable to create database '{s}' ({any})", .{ conf.db_path, e });
@@ -104,19 +101,34 @@ pub fn authenticate(a: std.mem.Allocator) !void {
             @memset(password.stderr, 0);
             a.free(password.stderr);
         }
-        std.log.info("{any}", .{password});
+        //std.debug.print("{any}", .{password});
 
         switch (password.term.Exited) {
             0 => {
-                var db = if (std.mem.containsAtLeast(u8, conf.db_path, 1, ".ccdb")) blk: {
-                    break :blk Database.ccdb.Database(
-                        conf.db_path,
-                        password.stdout[0 .. password.stdout.len - 1],
-                        a,
-                    ) catch {
-                        std.log.err("unable to instantiate Database", .{});
-                        continue :outer;
+                var db = if (std.mem.containsAtLeast(u8, conf.db_path, 1, ".ccdb")) {
+                    std.log.err("unsupported database {s}", .{conf.db_path});
+                    const r = std.process.Child.run(.{
+                        .allocator = a,
+                        .argv = &.{
+                            "zigenity",
+                            "--question",
+                            "--window-icon=/usr/share/passkeez/passkeez.png",
+                            "--icon=/usr/share/passkeez/passkeez-error.png",
+                            "Databases of type .ccdb are deprecated and no longer supported.",
+                            "Invalid database format",
+                            "--ok-label=Ok",
+                            "--switch-cancel",
+                            "--timeout=15",
+                        },
+                    }) catch |e2| {
+                        std.log.err("unable to execute zigenity ({any})", .{e2});
+                        return e2;
                     };
+                    defer {
+                        a.free(r.stdout);
+                        a.free(r.stderr);
+                    }
+                    return error.Failed;
                 } else if (std.mem.containsAtLeast(u8, conf.db_path, 1, ".kdbx")) blk: {
                     break :blk Database.kdbx.Database(
                         conf.db_path,

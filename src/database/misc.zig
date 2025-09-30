@@ -60,8 +60,9 @@ pub fn writeFile(path: []const u8, data: []const u8, a: std.mem.Allocator) !void
         return e;
     };
     defer f2.close();
+    var writer = f2.writer(&.{});
 
-    f2.writer().writeAll(data) catch |e| {
+    writer.interface.writeAll(data) catch |e| {
         std.log.err("Cannot persist data: ({any})", .{e});
         return e;
     };

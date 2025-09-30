@@ -2,7 +2,6 @@ const std = @import("std");
 const keylib = @import("keylib");
 const Credential = keylib.ctap.authenticator.Credential;
 
-pub const ccdb = @import("database/ccdb.zig");
 pub const kdbx = @import("database/kdbx.zig");
 
 const Self = @This();

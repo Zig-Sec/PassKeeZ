@@ -35,7 +35,7 @@ To get started please visit the [wiki](https://github.com/Zig-Sec/PassKeeZ/wiki/
 ### Database Management
 
 - KDBX: You can manage your `.kdbx` database with [KeePassXC](https://keepassxc.org/) or KeePass.
-- CCDB: Currently the only way to manage your Credentials is by using the [CCDB command line application](https://github.com/r4gus/ccdb).
+    - _We recommend making regular backups of your KDBX database._
 
 ### File synchronization
 
