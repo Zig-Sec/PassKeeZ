@@ -1,8 +1,8 @@
 #!/bin/bash
 
-PASSKEEZ_VERSION="0.5.3"
-ZIGENITY_VERSION="0.5.0"
-ZIG_VERSION="0.14.0"
+PASSKEEZ_VERSION="0.6.0"
+ZIGENITY_VERSION="0.6.0"
+ZIG_VERSION="0.15.1"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -41,8 +41,14 @@ function get_package_manager {
 function download_zig {
     cd /tmp
     sub=$(ls | grep "zig-")
-
-    curl -# -C - -o "zig.tar.xz" "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-${ARCH}-${ZIG_VERSION}.tar.xz"
+    case "${ZIG_VERSION}" in
+        "0.14.0"|"0.14.1")
+            curl -# -C - -o "zig.tar.xz" "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-${ARCH}-${ZIG_VERSION}.tar.xz"
+            ;;
+        *)
+            curl -# -C - -o "zig.tar.xz" "https://ziglang.org/download/${ZIG_VERSION}/zig-${ARCH}-linux-${ZIG_VERSION}.tar.xz"
+            ;;
+    esac
     tar -xf "zig.tar.xz"
     sub=$(ls | grep "zig-")
 
@@ -127,8 +133,9 @@ function check_config_folder {
 }
 
 function postinst {
-    # Create a new group called fido
-    getent group fido || (groupadd fido && usermod -a -G fido $SUDO_USER)
+    # Create a new (system) group called fido
+    # - for explanation why a system group see: https://github.com/Zig-Sec/PassKeeZ/issues/21
+    getent group fido || (groupadd -r fido && usermod -a -G fido $SUDO_USER)
 
     # Add uhid to the list of modules to load during boot
     echo "uhid" > /etc/modules-load.d/fido.conf
