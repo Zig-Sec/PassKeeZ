@@ -186,13 +186,7 @@ pub fn main() !void {
                 }
             }
         }
-        var timer = std.time.Timer.start() catch {
-            std.log.err("failed to start timer in main", .{});
-            continue;
-        };
-        while (timer.read() < 10000000) {
-            std.mem.doNotOptimizeAway(void);
-        }
+        std.posix.nanosleep(0, 10000000);
     }
 }
 
