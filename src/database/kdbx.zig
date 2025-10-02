@@ -337,8 +337,8 @@ pub fn createDialog(allocator: std.mem.Allocator, path: []const u8) !std.fs.File
                     return error.DatabaseError;
                 };
 
-                var writer = f_db.writer(&.{}).interface;
-                writer.writeAll(raw.written()) catch |e| {
+                var writer = f_db.writer(&.{});
+                writer.interface.writeAll(raw.written()) catch |e| {
                     std.log.err("Cannot write to database: {any}", .{e});
                     return error.DatabaseError;
                 };

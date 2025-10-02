@@ -1,7 +1,7 @@
 const std = @import("std");
 const misc = @import("misc.zig");
 
-db_path: []const u8 = "~/.passkeez/db.ccdb",
+db_path: []const u8 = "~/.passkeez/db.kdbx",
 lang: []const u8 = "english",
 
 pub fn load(a: std.mem.Allocator) !@This() {
