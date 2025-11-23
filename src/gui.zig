@@ -6,8 +6,8 @@ const Config = @import("Config.zig");
 
 var config: Config = undefined;
 
-var database_mutex = std.Thread.Mutex{};
-var database: ?kdbx.Database = null;
+//var database_mutex = std.Thread.Mutex{};
+//var database: ?kdbx.Database = null;
 
 pub const dvui_app: dvui.App = .{
     .config = .{
@@ -65,6 +65,8 @@ pub fn AppFrame() !dvui.App.Result {
 }
 
 pub fn frame() !dvui.App.Result {
+    const uniqueId = dvui.parentGet().extendId(@src(), 0);
+
     var scaler = dvui.scale(@src(), .{ .scale = &dvui.currentWindow().content_scale, .pinch_zoom = .global }, .{ .rect = .cast(dvui.windowRect()) });
     scaler.deinit();
 
@@ -99,6 +101,21 @@ pub fn frame() !dvui.App.Result {
 
             if (dvui.menuItemLabel(@src(), "Open Database", .{}, .{ .expand = .horizontal }) != null) {}
 
+            _ = dvui.separator(@src(), .{});
+
+            if (dvui.dataGetPtr(null, uniqueId, "database", kdbx.Database) != null) {
+                if (dvui.menuItemLabel(
+                    @src(),
+                    "Close Database",
+                    .{},
+                    .{
+                        .expand = .horizontal,
+                    },
+                ) != null) {
+                    close_database(dvui.currentWindow(), uniqueId);
+                }
+            }
+
             if (dvui.backend.kind != .web) {
                 if (dvui.menuItemLabel(@src(), "Exit", .{}, .{ .expand = .horizontal }) != null) {
                     return .close;
@@ -107,13 +124,11 @@ pub fn frame() !dvui.App.Result {
         }
     }
 
-    if (database) |db| {
-        _ = db;
-
+    if (dvui.dataGetPtr(null, uniqueId, "database", kdbx.Database) != null) {
         var outer_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
         defer outer_hbox.deinit();
 
-        try sidePannel();
+        try sidePannel(uniqueId);
 
         {
             var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
@@ -124,13 +139,15 @@ pub fn frame() !dvui.App.Result {
 
         // Those window functions will return if the show window flag is not set
     } else {
-        try loginWidget();
+        try loginWidget(uniqueId);
     }
 
     return .ok;
 }
 
-pub fn sidePannel() !void {
+pub fn sidePannel(uniqueId: dvui.Id) !void {
+    _ = uniqueId;
+
     var outer_vbox = dvui.box(@src(), .{}, .{
         .min_size_content = .{ .w = 250 },
         .max_size_content = .size(.{ .w = 250 }),
@@ -142,9 +159,14 @@ pub fn sidePannel() !void {
 
     var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
     defer scroll.deinit();
+
+    {
+        var tree = dvui.TreeWidget.tree(@src(), .{}, .{});
+        defer tree.deinit();
+    }
 }
 
-pub fn loginWidget() !void {
+pub fn loginWidget(uniqueId: dvui.Id) !void {
     const local = struct {
         var password: [128]u8 = .{0} ** 128;
         var path: [256]u8 = .{0} ** 256;
@@ -273,10 +295,10 @@ pub fn loginWidget() !void {
                     unlock_database_process,
                     .{
                         dvui.currentWindow(),
-                        getSlice(&local.path),
-                        getSlice(&local.password),
-                        &database,
+                        &local.path,
+                        &local.password,
                         gpa,
+                        uniqueId,
                         &local.spinner_active,
                     },
                 ) catch |err| {
@@ -294,27 +316,29 @@ pub fn loginWidget() !void {
 
 fn close_database(
     win: *dvui.Window,
-    db: *?kdbx.Database,
+    uniqueId: dvui.Id,
 ) void {
     _ = win;
 
-    if (db.* == null) return;
-
-    database_mutex.lock();
-    db.*.?.deinit();
-    db.* = null;
-    database_mutex.unlock();
+    if (dvui.dataGetPtr(null, uniqueId, "database", kdbx.Database)) |database| {
+        database.deinit();
+        dvui.dataRemove(null, uniqueId, "database");
+    }
 }
 
 fn unlock_database_process(
     win: *dvui.Window,
-    path: []const u8,
-    pw: []const u8,
-    db: *?kdbx.Database,
+    path_: []const u8,
+    pw_: []u8,
     a: std.mem.Allocator,
+    uniqueId: dvui.Id,
     spinner_active: *bool,
 ) void {
     defer spinner_active.* = false;
+    defer std.crypto.secureZero(u8, pw_);
+
+    const path = getSlice(path_);
+    const pw = getSlice(pw_);
 
     var f = std.fs.openFileAbsolute(path, .{}) catch {
         dvui.log.info(
@@ -334,12 +358,10 @@ fn unlock_database_process(
     };
     defer key.deinit();
 
-    database_mutex.lock();
-    db.* = kdbx.Database.open(&reader.interface, .{
+    const database = kdbx.Database.open(&reader.interface, .{
         .allocator = a,
         .key = key,
     }) catch |e| {
-        database_mutex.unlock();
         dvui.log.info(
             "unable to unlock database '{s}' ({any})",
             .{ path, e },
@@ -347,7 +369,8 @@ fn unlock_database_process(
         dvui.toast(@src(), .{ .window = win, .message = "Unlocking the database failed.\nDid you provide the correct password?" });
         return;
     };
-    database_mutex.unlock();
+
+    dvui.dataSet(win, uniqueId, "database", database);
 
     dvui.toast(@src(), .{ .window = win, .message = "Database unlocked successfully" });
 }
