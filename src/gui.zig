@@ -146,7 +146,94 @@ pub fn frame() !dvui.App.Result {
 }
 
 pub fn sidePannel(uniqueId: dvui.Id) !void {
-    _ = uniqueId;
+    const icon_color: dvui.Color = .{ .r = 0x3c, .g = 0xa3, .b = 0x70, .a = 0xff };
+
+    const recursor = struct {
+        fn search(
+            group: *kdbx.Group,
+            tree: *dvui.TreeWidget,
+            uid: dvui.Id,
+            branch_options: dvui.Options,
+            expander_options: dvui.Options,
+        ) !void {
+            var id_extra: usize = 0;
+            for (group.groups.items) |*inner_group| {
+                id_extra += 1;
+
+                var branch_opts_override = dvui.Options{
+                    .id_extra = id_extra,
+                    .expand = .horizontal,
+                };
+
+                const color = icon_color;
+
+                const branch = tree.branch(@src(), .{
+                    .expanded = false,
+                }, branch_opts_override.override(branch_options));
+                defer branch.deinit();
+
+                _ = dvui.icon(
+                    @src(),
+                    "FolderIcon",
+                    dvui.entypo.folder,
+                    .{
+                        .fill_color = icon_color,
+                    },
+                    .{
+                        .gravity_y = 0.5,
+                        .padding = dvui.Rect.all(4),
+                    },
+                );
+                dvui.label(@src(), "{s}", .{inner_group.name}, .{
+                    .color_text = dvui.themeGet().color(.control, .text),
+                    .padding = dvui.Rect.all(4),
+                });
+                _ = dvui.icon(
+                    @src(),
+                    "DropIcon",
+                    if (branch.expanded) dvui.entypo.triangle_down else dvui.entypo.triangle_right,
+                    .{ .fill_color = icon_color },
+                    .{
+                        .gravity_y = 0.5,
+                        .gravity_x = 1.0,
+                        .padding = dvui.Rect.all(4),
+                    },
+                );
+
+                var expander_opts_override = dvui.Options{
+                    .margin = .{ .x = 14 },
+                    .color_border = color,
+                    .expand = .horizontal,
+                };
+
+                if (branch.expander(@src(), .{ .indent = 14 }, expander_opts_override.override(expander_options))) {
+                    try search(
+                        inner_group,
+                        tree,
+                        uid,
+                        branch_options,
+                        expander_options,
+                    );
+                }
+            }
+        }
+    }.search;
+
+    const bopts: dvui.Options = .{
+        .margin = dvui.Rect.all(1),
+        .padding = dvui.Rect.all(2),
+    };
+    const eopts: dvui.Options = .{
+        .border = .{ .x = 1 },
+        .corner_radius = dvui.Rect.all(4),
+        .box_shadow = .{
+            .color = .black,
+            .offset = .{ .x = -5, .y = 5 },
+            .shrink = 5,
+            .fade = 10,
+            .alpha = 0.15,
+        },
+    };
 
     var outer_vbox = dvui.box(@src(), .{}, .{
         .min_size_content = .{ .w = 250 },
@@ -160,9 +247,80 @@ pub fn sidePannel(uniqueId: dvui.Id) !void {
     var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
     defer scroll.deinit();
 
-    {
-        var tree = dvui.TreeWidget.tree(@src(), .{}, .{});
+    if (dvui.dataGetPtr(null, uniqueId, "database", kdbx.Database)) |db| {
+        var tree = dvui.TreeWidget.tree(
+            @src(),
+            .{},
+            .{ .expand = .horizontal },
+        );
         defer tree.deinit();
+
+        { // Root is always expanded
+            const branch = tree.branch(
+                @src(),
+                .{
+                    .expanded = true,
+                },
+                .{ .expand = .horizontal },
+            );
+            defer branch.deinit();
+
+            _ = dvui.icon(
+                @src(),
+                "FileIcon",
+                dvui.entypo.folder,
+                .{ .fill_color = icon_color },
+                .{
+                    .gravity_y = 0.5,
+                    .padding = dvui.Rect.all(4),
+                },
+            );
+            dvui.label(@src(), "{s}", .{"Root"}, .{
+                .color_text = dvui.themeGet().color(.control, .text),
+                .padding = dvui.Rect.all(4),
+            });
+            _ = dvui.icon(
+                @src(),
+                "DropIcon",
+                if (branch.expanded) dvui.entypo.triangle_down else dvui.entypo.triangle_right,
+                .{
+                    .fill_color = icon_color,
+                },
+                .{
+                    .gravity_y = 0.5,
+                    .gravity_x = 1.0,
+                    .padding = dvui.Rect.all(4),
+                },
+            );
+
+            if (branch.expander(
+                @src(),
+                .{ .indent = 14.0 },
+                .{
+                    .color_fill = dvui.themeGet().color(.window, .fill),
+                    .color_border = icon_color,
+                    .expand = .horizontal,
+                    .corner_radius = branch.button.wd.options.corner_radius,
+                    .background = true,
+                    .border = .{ .x = 1 },
+                    .box_shadow = .{
+                        .color = .black,
+                        .offset = .{ .x = -5, .y = 5 },
+                        .shrink = 5,
+                        .fade = 10,
+                        .alpha = 0.15,
+                    },
+                },
+            )) {
+                try recursor(
+                    &db.body.root,
+                    tree,
+                    uniqueId,
+                    bopts,
+                    eopts,
+                );
+            }
+        }
     }
 }
 
@@ -176,7 +334,21 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
             @memset(&path, 0);
             @memcpy(path[0..p.len], p);
         }
+
+        pub fn setPw(p: []const u8) void {
+            std.crypto.secureZero(u8, &password);
+            @memcpy(password[0..p.len], p);
+        }
+
+        var first: bool = true;
+
+        pub fn setTestData() void {}
     };
+
+    if (local.first) {
+        local.first = false;
+        local.setTestData();
+    }
 
     var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
     defer vbox.deinit();
