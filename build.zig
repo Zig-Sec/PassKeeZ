@@ -19,6 +19,11 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const dvui_dep = b.dependency(
+        "dvui",
+        .{ .target = target, .optimize = optimize, .backend = .sdl3 },
+    );
+
     const exe = b.addExecutable(.{
         .name = "passkeez",
         .root_module = b.createModule(.{
@@ -57,4 +62,21 @@ pub fn build(b: *std.Build) void {
 
     //const test_step = b.step("test", "Run unit tests");
     //test_step.dependOn(&run_unit_tests.step);
+
+    const manager_exe = b.addExecutable(.{
+        .name = "passkeez-gui",
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .root_source_file = b.path("src/gui.zig"),
+            .imports = &.{
+                .{ .name = "kdbx", .module = kdbx_dep.module("kdbx") },
+                .{ .name = "uuid", .module = uuid_dep.module("uuid") },
+                .{ .name = "dvui", .module = dvui_dep.module("dvui_sdl3") },
+            },
+        }),
+    });
+    const install_step = b.addInstallArtifact(manager_exe, .{});
+    const manager_step = b.step("manager", "Compile the PassKeeZ password manager GUI application");
+    manager_step.dependOn(&install_step.step);
 }

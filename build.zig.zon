@@ -16,6 +16,10 @@
             .url = "https://github.com/Zig-Sec/kdbx/archive/refs/tags/0.2.3.tar.gz",
             .hash = "kdbx-0.2.3-eJXZBJWkEgDQRsIA_22SQSygPD6WlqEbjW83djSNqjQN",
         },
+        .dvui = .{
+            .url = "git+https://github.com/david-vanderson/dvui?ref=main#c9a984f9c583bdb4c650423bbd5890fda6d1d26a",
+            .hash = "dvui-0.4.0-dev-AQFJmfR41gAOOAUVjRweL3nKPmXRkVT6HmAInb-Kjni5",
+        },
     },
     .paths = .{
         "build.zig",
