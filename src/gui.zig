@@ -5,6 +5,8 @@ const kdbx = @import("kdbx");
 const Config = @import("Config.zig");
 
 var config: Config = undefined;
+
+var database_mutex = std.Thread.Mutex{};
 var database: ?kdbx.Database = null;
 
 pub const dvui_app: dvui.App = .{
@@ -192,7 +194,18 @@ pub fn loginWidget() !void {
             );
             te.deinit();
 
-            if (dvui.button(@src(), "Select File", .{}, .{})) {
+            var ttout: dvui.WidgetData = undefined;
+            if (dvui.buttonIcon(
+                @src(),
+                "folder",
+                dvui.entypo.folder,
+                .{},
+                .{},
+                .{
+                    .gravity_y = 0.5,
+                    .data_out = &ttout,
+                },
+            )) {
                 const filename = dvui.dialogNativeFileOpen(
                     dvui.currentWindow().arena(),
                     .{ .title = "Select Database File" },
@@ -204,6 +217,13 @@ pub fn loginWidget() !void {
                     local.setPath(f);
                 }
             }
+            dvui.tooltip(
+                @src(),
+                .{ .active_rect = ttout.borderRectScale().r },
+                "Select a database file",
+                .{},
+                .{},
+            );
         }
 
         {
@@ -246,37 +266,6 @@ pub fn loginWidget() !void {
             if (dvui.button(@src(), "unlock", .{}, .{
                 .expand = .horizontal,
             })) blk: {
-                //var f = std.fs.openFileAbsolute(getSlice(&local.path), .{}) catch {
-                //    dvui.log.info(
-                //        "unable to open database file '{s}'",
-                //        .{getSlice(&local.path)},
-                //    );
-                //    break :blk;
-                //};
-                //defer f.close();
-
-                //var buffer: [1024]u8 = undefined;
-                //var reader = f.reader(&buffer);
-
-                //const key = kdbx.DatabaseKey{
-                //    .password = try gpa.dupe(u8, getSlice(&local.password)),
-                //    .allocator = gpa,
-                //};
-                //defer key.deinit();
-
-                //const db = kdbx.Database.open(&reader.interface, .{
-                //    .allocator = gpa,
-                //    .key = key,
-                //}) catch |e| {
-                //    dvui.log.info(
-                //        "unable to unlock database '{s}' ({any})",
-                //        .{ getSlice(&local.path), e },
-                //    );
-                //    break :blk;
-                //};
-
-                //database = db;
-
                 local.spinner_active = true;
 
                 const bg_thread = std.Thread.spawn(
@@ -303,6 +292,20 @@ pub fn loginWidget() !void {
     }
 }
 
+fn close_database(
+    win: *dvui.Window,
+    db: *?kdbx.Database,
+) void {
+    _ = win;
+
+    if (db.* == null) return;
+
+    database_mutex.lock();
+    db.*.?.deinit();
+    db.* = null;
+    database_mutex.unlock();
+}
+
 fn unlock_database_process(
     win: *dvui.Window,
     path: []const u8,
@@ -312,8 +315,6 @@ fn unlock_database_process(
     spinner_active: *bool,
 ) void {
     defer spinner_active.* = false;
-    //_ = spinner_active;
-    _ = win;
 
     var f = std.fs.openFileAbsolute(path, .{}) catch {
         dvui.log.info(
@@ -333,16 +334,22 @@ fn unlock_database_process(
     };
     defer key.deinit();
 
+    database_mutex.lock();
     db.* = kdbx.Database.open(&reader.interface, .{
         .allocator = a,
         .key = key,
     }) catch |e| {
+        database_mutex.unlock();
         dvui.log.info(
             "unable to unlock database '{s}' ({any})",
             .{ path, e },
         );
+        dvui.toast(@src(), .{ .window = win, .message = "Unlocking the database failed.\nDid you provide the correct password?" });
         return;
     };
+    database_mutex.unlock();
+
+    dvui.toast(@src(), .{ .window = win, .message = "Database unlocked successfully" });
 }
 
 pub fn getSlice(s: []const u8) []const u8 {
