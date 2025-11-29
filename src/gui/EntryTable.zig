@@ -11,6 +11,8 @@ pub fn draw(uniqueId: dvui.Id) void {
         const equal_spacing = [num_cols]f32{ -1, -1, -1 };
         var col_widths: [num_cols]f32 = @splat(100); // Default width to 100
 
+        var highlighted_row: ?usize = null;
+
         const resize_min = 80;
         const resize_max = 500;
         fn headerResizeOptions(grid: *dvui.GridWidget, col_num: usize) ?dvui.GridWidget.HeaderResizeWidget.InitOptions {
@@ -24,25 +26,20 @@ pub fn draw(uniqueId: dvui.Id) void {
         }
     };
 
-    const banded: dvui.GridWidget.CellStyle.Banded = .{
-        .opts = .{
-            .margin = dvui.TextLayoutWidget.defaults.margin,
-            .padding = dvui.TextLayoutWidget.defaults.padding,
-        },
-        .alt_cell_opts = .{
-            .color_fill = dvui.themeGet().color(.control, .fill_press),
-            .background = true,
-        },
-    };
-    const banded_centered = banded.optionsOverride(.{ .gravity_x = 0.5, .expand = .horizontal });
-    _ = banded_centered;
-
     var grid = dvui.grid(@src(), .colWidths(&local.col_widths), .{}, .{
         .expand = .both,
         .background = true,
         .border = dvui.Rect.all(2),
     });
     defer grid.deinit();
+
+    var banded: dvui.GridWidget.CellStyle.HoveredRow = .{
+        .cell_opts = .{
+            .background = true,
+            .color_fill_hover = dvui.themeGet().color(.control, .fill_hover),
+        },
+    };
+    banded.processEvents(grid);
 
     const col_widths_src = local.equal_spacing;
 
@@ -95,6 +92,19 @@ pub fn draw(uniqueId: dvui.Id) void {
                     .{},
                     banded.options(cell),
                 );
+            }
+        }
+
+        const evts = dvui.events();
+        for (evts) |*e| {
+            if (!dvui.eventMatchSimple(e, grid.data())) {
+                continue;
+            }
+
+            if (e.evt == .mouse and e.evt.mouse.action == .press) {
+                if (grid.pointToCell(dvui.currentWindow().mouse_pt)) |cell| {
+                    std.debug.print("klicked {d}\n", .{cell.row_num});
+                }
             }
         }
     }
