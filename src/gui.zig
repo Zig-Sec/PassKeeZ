@@ -4,10 +4,9 @@ const dvui = @import("dvui");
 const kdbx = @import("kdbx");
 const Config = @import("Config.zig");
 
-var config: Config = undefined;
+const EntryTable = @import("gui/EntryTable.zig");
 
-//var database_mutex = std.Thread.Mutex{};
-//var database: ?kdbx.Database = null;
+pub var config: Config = undefined;
 
 pub const dvui_app: dvui.App = .{
     .config = .{
@@ -36,6 +35,9 @@ const gpa = gpa_instance.allocator();
 
 var orig_content_scale: f32 = 1.0;
 
+var uId: dvui.Id = undefined;
+var window: *dvui.Window = undefined;
+
 // Runs before the first frame, after backend and dvui.Window.init()
 // - runs between win.begin()/win.end()
 pub fn AppInit(win: *dvui.Window) !void {
@@ -52,10 +54,14 @@ pub fn AppInit(win: *dvui.Window) !void {
             .dark => dvui.Theme.builtin.adwaita_dark,
         };
     }
+
+    uId = dvui.parentGet().extendId(@src(), 0);
+    window = dvui.currentWindow();
 }
 
 // Run as app is shutting down before dvui.Window.deinit()
 pub fn AppDeinit() void {
+    close_database(window, uId);
     config.deinit(gpa);
 }
 
@@ -65,8 +71,6 @@ pub fn AppFrame() !dvui.App.Result {
 }
 
 pub fn frame() !dvui.App.Result {
-    const uniqueId = dvui.parentGet().extendId(@src(), 0);
-
     var scaler = dvui.scale(@src(), .{ .scale = &dvui.currentWindow().content_scale, .pinch_zoom = .global }, .{ .rect = .cast(dvui.windowRect()) });
     scaler.deinit();
 
@@ -103,7 +107,7 @@ pub fn frame() !dvui.App.Result {
 
             _ = dvui.separator(@src(), .{});
 
-            if (dvui.dataGetPtr(null, uniqueId, "database", kdbx.Database) != null) {
+            if (dvui.dataGetPtr(null, uId, "database", kdbx.Database) != null) {
                 if (dvui.menuItemLabel(
                     @src(),
                     "Close Database",
@@ -112,7 +116,7 @@ pub fn frame() !dvui.App.Result {
                         .expand = .horizontal,
                     },
                 ) != null) {
-                    close_database(dvui.currentWindow(), uniqueId);
+                    close_database(window, uId);
                 }
             }
 
@@ -124,22 +128,23 @@ pub fn frame() !dvui.App.Result {
         }
     }
 
-    if (dvui.dataGetPtr(null, uniqueId, "database", kdbx.Database) != null) {
+    if (dvui.dataGetPtr(null, uId, "database", kdbx.Database) != null) {
         var outer_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
         defer outer_hbox.deinit();
 
-        try sidePannel(uniqueId);
+        try sidePannel(uId);
 
         {
             var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
             defer scroll.deinit();
 
             // TODO: put here the main element
+            EntryTable.draw(uId);
         }
 
         // Those window functions will return if the show window flag is not set
     } else {
-        try loginWidget(uniqueId);
+        try loginWidget(uId);
     }
 
     return .ok;
@@ -487,14 +492,12 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
 }
 
 fn close_database(
-    win: *dvui.Window,
+    win: ?*dvui.Window,
     uniqueId: dvui.Id,
 ) void {
-    _ = win;
-
-    if (dvui.dataGetPtr(null, uniqueId, "database", kdbx.Database)) |database| {
+    if (dvui.dataGetPtr(win, uniqueId, "database", kdbx.Database)) |database| {
         database.deinit();
-        dvui.dataRemove(null, uniqueId, "database");
+        dvui.dataRemove(win, uniqueId, "database");
     }
 }
 
@@ -543,6 +546,9 @@ fn unlock_database_process(
     };
 
     dvui.dataSet(win, uniqueId, "database", database);
+
+    const root_ptr = &dvui.dataGetPtr(win, uniqueId, "database", kdbx.Database).?.body.root;
+    dvui.dataSet(win, uniqueId, "group", root_ptr);
 
     dvui.toast(@src(), .{ .window = win, .message = "Database unlocked successfully" });
 }
