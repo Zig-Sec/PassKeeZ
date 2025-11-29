@@ -24,86 +24,148 @@ pub fn draw(uniqueId: dvui.Id) void {
                 .max_size = resize_max,
             };
         }
+
+        var selected_entry_id: ?usize = null;
     };
 
-    var grid = dvui.grid(@src(), .colWidths(&local.col_widths), .{}, .{
-        .expand = .both,
-        .background = true,
-        .border = dvui.Rect.all(2),
-    });
-    defer grid.deinit();
+    var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
+    defer vbox.deinit();
 
-    var banded: dvui.GridWidget.CellStyle.HoveredRow = .{
-        .cell_opts = .{
-            .background = true,
-            .color_fill_hover = dvui.themeGet().color(.control, .fill_hover),
-        },
-    };
-    banded.processEvents(grid);
+    // This is the context window for an entry which is placed on the bottom
+    // (below the table).
+    {
+        var outer_vbox = dvui.box(@src(), .{
+            .dir = .vertical,
+        }, .{
+            .min_size_content = .{ .h = 180 },
+            .expand = .both,
+            .border = dvui.Rect.all(1),
+            .gravity_y = 1.0,
+        });
+        defer outer_vbox.deinit();
 
-    const col_widths_src = local.equal_spacing;
+        var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
+        defer scroll.deinit();
 
-    dvui.columnLayoutProportional(
-        &col_widths_src,
-        &local.col_widths,
-        grid.data().contentRect().w,
-    );
+        if (local.selected_entry_id) |eid| {
+            if (dvui.dataGet(null, uniqueId, "group", *kdbx.Group)) |group| {
+                const entry = group.entries.items[eid];
 
-    dvui.gridHeading(@src(), grid, 0, "Title", local.headerResizeOptions(grid, 0), .{});
-    dvui.gridHeading(@src(), grid, 1, "Username", local.headerResizeOptions(grid, 1), .{});
-    dvui.gridHeading(@src(), grid, 2, "URL", local.headerResizeOptions(grid, 2), .{});
+                {
+                    var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
+                    defer inner_hbox.deinit();
 
-    // for loop
-    if (dvui.dataGet(null, uniqueId, "group", *kdbx.Group)) |group| {
-        for (group.entries.items, 0..) |item, row_num| {
-            var cell: dvui.GridWidget.Cell = .colRow(0, row_num);
-
-            {
-                defer cell.col_num += 1;
-                var cell_box = grid.bodyCell(@src(), cell, banded.cellOptions(cell));
-                defer cell_box.deinit();
-                dvui.labelNoFmt(
-                    @src(),
-                    if (item.get("Title")) |name| name else "",
-                    .{},
-                    banded.options(cell),
-                );
-            }
-
-            {
-                defer cell.col_num += 1;
-                var cell_box = grid.bodyCell(@src(), cell, banded.cellOptions(cell));
-                defer cell_box.deinit();
-                dvui.labelNoFmt(
-                    @src(),
-                    if (item.get("UserName")) |name| name else "",
-                    .{},
-                    banded.options(cell),
-                );
-            }
-
-            {
-                defer cell.col_num += 1;
-                var cell_box = grid.bodyCell(@src(), cell, banded.cellOptions(cell));
-                defer cell_box.deinit();
-                dvui.labelNoFmt(
-                    @src(),
-                    if (item.get("URL")) |name| name else "",
-                    .{},
-                    banded.options(cell),
-                );
+                    dvui.label(
+                        @src(),
+                        "Title: {s}",
+                        .{
+                            if (entry.get("Title")) |v| v else "",
+                        },
+                        .{ .gravity_y = 0.5 },
+                    );
+                }
             }
         }
+    }
 
-        const evts = dvui.events();
-        for (evts) |*e| {
-            if (!dvui.eventMatchSimple(e, grid.data())) {
-                continue;
+    {
+        var grid = dvui.grid(@src(), .colWidths(&local.col_widths), .{}, .{
+            .expand = .both,
+            .background = true,
+            .border = dvui.Rect.all(2),
+        });
+        defer grid.deinit();
+
+        var banded: dvui.GridWidget.CellStyle.HoveredRow = .{
+            .cell_opts = .{
+                .background = true,
+                .color_fill_hover = dvui.themeGet().color(.control, .fill_hover),
+            },
+        };
+        banded.processEvents(grid);
+
+        const col_widths_src = local.equal_spacing;
+
+        dvui.columnLayoutProportional(
+            &col_widths_src,
+            &local.col_widths,
+            grid.data().contentRect().w,
+        );
+
+        dvui.gridHeading(@src(), grid, 0, "Title", local.headerResizeOptions(grid, 0), .{});
+        dvui.gridHeading(@src(), grid, 1, "Username", local.headerResizeOptions(grid, 1), .{});
+        dvui.gridHeading(@src(), grid, 2, "URL", local.headerResizeOptions(grid, 2), .{});
+
+        // for loop
+        if (dvui.dataGet(null, uniqueId, "group", *kdbx.Group)) |group| {
+            for (group.entries.items, 0..) |item, row_num| {
+                var cell: dvui.GridWidget.Cell = .colRow(0, row_num);
+
+                {
+                    defer cell.col_num += 1;
+                    var cell_box = grid.bodyCell(@src(), cell, banded.cellOptions(cell));
+                    defer cell_box.deinit();
+                    dvui.labelNoFmt(
+                        @src(),
+                        if (item.get("Title")) |name| name else "",
+                        .{},
+                        banded.options(cell),
+                    );
+                }
+
+                {
+                    defer cell.col_num += 1;
+                    var cell_box = grid.bodyCell(@src(), cell, banded.cellOptions(cell));
+                    defer cell_box.deinit();
+                    dvui.labelNoFmt(
+                        @src(),
+                        if (item.get("UserName")) |name| name else "",
+                        .{},
+                        banded.options(cell),
+                    );
+                }
+
+                {
+                    defer cell.col_num += 1;
+                    var cell_box = grid.bodyCell(@src(), cell, banded.cellOptions(cell));
+                    defer cell_box.deinit();
+                    dvui.labelNoFmt(
+                        @src(),
+                        if (item.get("URL")) |name| name else "",
+                        .{},
+                        banded.options(cell),
+                    );
+                }
             }
 
-            if (e.evt == .mouse and e.evt.mouse.action == .press) {
-                if (grid.pointToCell(dvui.currentWindow().mouse_pt)) |cell| {
-                    std.debug.print("klicked {d}\n", .{cell.row_num});
+            // Mouse / Keyboard handling
+
+            // Right click => context menu
+            {
+                const ctext = dvui.context(@src(), .{ .rect = grid.data().borderRectScale().r }, .{});
+                defer ctext.deinit();
+
+                if (ctext.activePoint()) |cp| {
+                    var fw2 = dvui.floatingMenu(@src(), .{ .from = dvui.Rect.Natural.fromPoint(cp) }, .{});
+                    defer fw2.deinit();
+
+                    _ = dvui.menuItemLabel(@src(), "Copy Username", .{}, .{ .expand = .horizontal });
+                    _ = dvui.menuItemLabel(@src(), "Copy Password", .{}, .{ .expand = .horizontal });
+                }
+            }
+
+            const evts = dvui.events();
+            for (evts) |*e| {
+                if (!dvui.eventMatchSimple(e, grid.data())) {
+                    continue;
+                }
+
+                // Left click => select entry
+                if (e.evt == .mouse and e.evt.mouse.action == .press) {
+                    if (grid.pointToCell(dvui.currentWindow().mouse_pt)) |cell| {
+                        //std.debug.print("klicked {d}\n", .{cell.row_num});
+                        local.selected_entry_id = cell.row_num;
+                    }
                 }
             }
         }

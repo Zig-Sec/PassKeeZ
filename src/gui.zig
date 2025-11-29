@@ -134,13 +134,8 @@ pub fn frame() !dvui.App.Result {
 
         try sidePannel(uId);
 
-        {
-            var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
-            defer scroll.deinit();
-
-            // TODO: put here the main element
-            EntryTable.draw(uId);
-        }
+        // TODO: put here the main element
+        EntryTable.draw(uId);
 
         // Those window functions will return if the show window flag is not set
     } else {
