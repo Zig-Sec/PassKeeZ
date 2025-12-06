@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 const dvui = @import("dvui");
 const kdbx = @import("kdbx");
 const root = @import("root");
+const clipboard = @import("../clipboard.zig");
 
 pub fn draw(uniqueId: dvui.Id) void {
     const local = struct {
@@ -26,6 +27,7 @@ pub fn draw(uniqueId: dvui.Id) void {
         }
 
         var selected_entry_id: ?usize = null;
+        var selected_entry_guuid: ?u128 = null;
     };
 
     var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
@@ -47,22 +49,64 @@ pub fn draw(uniqueId: dvui.Id) void {
         var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
         defer scroll.deinit();
 
-        if (local.selected_entry_id) |eid| {
+        if (local.selected_entry_id) |eid| blk: {
             if (dvui.dataGet(null, uniqueId, "group", *kdbx.Group)) |group| {
+                // Make sure the group hasn't changed and the index is not out of bounds.
+                if (local.selected_entry_guuid != group.uuid or eid >= group.entries.items.len) {
+                    local.selected_entry_id = null;
+                    break :blk;
+                }
+
                 const entry = group.entries.items[eid];
 
+                dvui.label(
+                    @src(),
+                    "{s}",
+                    .{
+                        if (entry.get("Title")) |v| v else "",
+                    },
+                    .{},
+                );
+
+                var left_alignment = dvui.Alignment.init(@src(), 0);
+                defer left_alignment.deinit();
+
                 {
-                    var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
+                    var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
                     defer inner_hbox.deinit();
 
-                    dvui.label(
-                        @src(),
-                        "Title: {s}",
-                        .{
-                            if (entry.get("Title")) |v| v else "",
-                        },
-                        .{ .gravity_y = 0.5 },
-                    );
+                    dvui.label(@src(), "User Name", .{}, .{});
+                    left_alignment.spacer(@src(), 0);
+
+                    dvui.label(@src(), "{s}", .{
+                        if (entry.get("UserName")) |v| v else "",
+                    }, .{});
+                }
+
+                {
+                    var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+                    defer inner_hbox.deinit();
+
+                    dvui.label(@src(), "URL", .{}, .{});
+                    left_alignment.spacer(@src(), 0);
+
+                    if (entry.get("URL")) |url| {
+                        dvui.link(@src(), .{
+                            .label = url,
+                            .url = url,
+                        }, .{});
+                    }
+                }
+
+                {
+                    var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+                    defer inner_hbox.deinit();
+
+                    dvui.label(@src(), "Password", .{}, .{});
+
+                    left_alignment.spacer(@src(), 0);
+
+                    dvui.label(@src(), "*****", .{}, .{});
                 }
             }
         }
@@ -149,7 +193,14 @@ pub fn draw(uniqueId: dvui.Id) void {
                     var fw2 = dvui.floatingMenu(@src(), .{ .from = dvui.Rect.Natural.fromPoint(cp) }, .{});
                     defer fw2.deinit();
 
-                    _ = dvui.menuItemLabel(@src(), "Copy Username", .{}, .{ .expand = .horizontal });
+                    if (dvui.menuItemLabel(@src(), "Copy Username", .{}, .{ .expand = .horizontal }) != null) {
+                        clipboard.write("hello") catch {};
+                        ctext.close();
+                        //if (grid.pointToCell(cp.)) |cell| {
+                        //    const e = group.entries.items[cell.row_num];
+                        //    std.debug.print("{s}\n", .{e.get("UserName").?});
+                        //}
+                    }
                     _ = dvui.menuItemLabel(@src(), "Copy Password", .{}, .{ .expand = .horizontal });
                 }
             }
@@ -165,6 +216,7 @@ pub fn draw(uniqueId: dvui.Id) void {
                     if (grid.pointToCell(dvui.currentWindow().mouse_pt)) |cell| {
                         //std.debug.print("klicked {d}\n", .{cell.row_num});
                         local.selected_entry_id = cell.row_num;
+                        local.selected_entry_guuid = group.uuid;
                     }
                 }
             }

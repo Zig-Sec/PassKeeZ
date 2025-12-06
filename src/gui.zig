@@ -132,7 +132,7 @@ pub fn frame() !dvui.App.Result {
         var outer_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
         defer outer_hbox.deinit();
 
-        try sidePannel(uId);
+        try sidePannel(window, uId);
 
         // TODO: put here the main element
         EntryTable.draw(uId);
@@ -145,11 +145,16 @@ pub fn frame() !dvui.App.Result {
     return .ok;
 }
 
-pub fn sidePannel(uniqueId: dvui.Id) !void {
+pub fn sidePannel(
+    win: *dvui.Window,
+    uniqueId: dvui.Id,
+) !void {
     const icon_color: dvui.Color = .{ .r = 0x3c, .g = 0xa3, .b = 0x70, .a = 0xff };
 
     const recursor = struct {
         fn search(
+            win_: *dvui.Window,
+            uniqueId_: dvui.Id,
             group: *kdbx.Group,
             tree: *dvui.TreeWidget,
             uid: dvui.Id,
@@ -188,32 +193,41 @@ pub fn sidePannel(uniqueId: dvui.Id) !void {
                     .color_text = dvui.themeGet().color(.control, .text),
                     .padding = dvui.Rect.all(4),
                 });
-                _ = dvui.icon(
-                    @src(),
-                    "DropIcon",
-                    if (branch.expanded) dvui.entypo.triangle_down else dvui.entypo.triangle_right,
-                    .{ .fill_color = icon_color },
-                    .{
-                        .gravity_y = 0.5,
-                        .gravity_x = 1.0,
-                        .padding = dvui.Rect.all(4),
-                    },
-                );
 
-                var expander_opts_override = dvui.Options{
-                    .margin = .{ .x = 14 },
-                    .color_border = color,
-                    .expand = .horizontal,
-                };
+                if (branch.button.clicked()) {
+                    dvui.dataSet(win_, uniqueId_, "group", inner_group);
+                }
 
-                if (branch.expander(@src(), .{ .indent = 14 }, expander_opts_override.override(expander_options))) {
-                    try search(
-                        inner_group,
-                        tree,
-                        uid,
-                        branch_options,
-                        expander_options,
+                if (inner_group.groups.items.len > 0) {
+                    _ = dvui.icon(
+                        @src(),
+                        "DropIcon",
+                        if (branch.expanded) dvui.entypo.triangle_down else dvui.entypo.triangle_right,
+                        .{ .fill_color = icon_color },
+                        .{
+                            .gravity_y = 0.5,
+                            .gravity_x = 1.0,
+                            .padding = dvui.Rect.all(4),
+                        },
                     );
+
+                    var expander_opts_override = dvui.Options{
+                        .margin = .{ .x = 14 },
+                        .color_border = color,
+                        .expand = .horizontal,
+                    };
+
+                    if (branch.expander(@src(), .{ .indent = 14 }, expander_opts_override.override(expander_options))) {
+                        try search(
+                            win_,
+                            uniqueId_,
+                            inner_group,
+                            tree,
+                            uid,
+                            branch_options,
+                            expander_options,
+                        );
+                    }
                 }
             }
         }
@@ -293,6 +307,10 @@ pub fn sidePannel(uniqueId: dvui.Id) !void {
                 },
             );
 
+            if (branch.button.clicked()) {
+                dvui.dataSet(win, uniqueId, "group", &db.body.root);
+            }
+
             if (branch.expander(
                 @src(),
                 .{ .indent = 14.0 },
@@ -313,6 +331,8 @@ pub fn sidePannel(uniqueId: dvui.Id) !void {
                 },
             )) {
                 try recursor(
+                    win,
+                    uniqueId,
                     &db.body.root,
                     tree,
                     uniqueId,
