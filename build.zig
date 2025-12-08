@@ -73,6 +73,10 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "kdbx", .module = kdbx_dep.module("kdbx") },
                 .{ .name = "uuid", .module = uuid_dep.module("uuid") },
                 .{ .name = "dvui", .module = dvui_dep.module("dvui_sdl3") },
+                .{
+                    .name = "clipboard",
+                    .module = b.dependency("clipboard", .{}).module("clipboard"),
+                },
             },
         }),
     });

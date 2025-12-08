@@ -20,6 +20,10 @@
             .url = "git+https://github.com/david-vanderson/dvui?ref=main#c9a984f9c583bdb4c650423bbd5890fda6d1d26a",
             .hash = "dvui-0.4.0-dev-AQFJmfR41gAOOAUVjRweL3nKPmXRkVT6HmAInb-Kjni5",
         },
+        .clipboard = .{
+            .url = "https://github.com/dgv/clipboard/archive/refs/heads/main.zip",
+            .hash = "clipboard-0.1.0-4y-6fXgjAAAG9lcF33e0cBPUg-ynG3L6vvPYgei-gokt",
+        },
     },
     .paths = .{
         "build.zig",

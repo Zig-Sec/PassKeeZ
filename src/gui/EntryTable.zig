@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 const dvui = @import("dvui");
 const kdbx = @import("kdbx");
 const root = @import("root");
-const clipboard = @import("../clipboard.zig");
+const clipboard = @import("clipboard");
 
 pub fn draw(uniqueId: dvui.Id) void {
     const local = struct {
