@@ -5,7 +5,9 @@
 
 PassKeeZ is a Passkey (FIDO2) compatible authenticator for Linux based on [keylib](https://github.com/r4gus/keylib).
 
-**To get started, please visit the [Wiki](https://github.com/Zig-Sec/PassKeeZ/wiki)**.
+**To get started, please visit the [Wiki](https://github.com/Zig-Sec/PassKeeZ/wiki)**. The video below shows the full installation via the installer script.
+
+[![Installing PassKeeZ Video](https://img.youtube.com/vi/_Z2yj9kszvU/0.jpg)](https://www.youtube.com/watch?v=_Z2yj9kszvU)
 
 The project currently supports only Linux due to the absence of a standardized API for interprocess communication (IPC) between the client and authenticator. As a workaround, platform authenticators on Linux act as virtual USB HID devices utilizing uhid. However, extending this functionality to other platforms remains unexplored as I haven't had the opportunity to investigate the equivalent mechanisms elsewhere.
 
