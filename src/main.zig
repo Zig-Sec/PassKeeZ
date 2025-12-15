@@ -301,8 +301,8 @@ pub fn my_up(
         .argv = &.{
             "zigenity",
             "--question",
-            "--window-icon=/usr/local/bin/passkeez/passkeez.png",
-            "--icon=/usr/local/bin/passkeez/passkeez-question.png",
+            "--window-icon=/usr/share/passkeez/passkeez.png",
+            "--icon=/usr/share/passkeez/passkeez-question.png",
             text,
             i18n.get(State.conf.lang).user_presence_title,
             "--timeout=30",
