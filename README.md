@@ -1,7 +1,6 @@
 ![Screenshot from 2025-04-15 11-16-56](https://github.com/user-attachments/assets/2ed6b32a-92d9-4fca-88ce-56f1e7b521ff)
 
-![GitHub](https://img.shields.io/github/license/Zig-Sec/PassKeeZ?style=flat-square)
-<noscript><a href="https://liberapay.com/r4gus/donate"><img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg"></a></noscript>
+## **Work is continued on Codeberg: https://codeberg.org/r4gus/PassKeeZ**.
 
 PassKeeZ is a Passkey (FIDO2) compatible authenticator for Linux based on [keylib](https://github.com/r4gus/keylib).
 
