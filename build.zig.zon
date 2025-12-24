@@ -1,20 +1,20 @@
 .{
     .name = .passkeez,
-    .version = "0.6.2",
+    .version = "0.6.3",
     .minimum_zig_version = "0.15.1",
     .fingerprint = 0xdd1692d15d21a6f6,
     .dependencies = .{
-        .keylib = .{
-            .url = "https://github.com/Zig-Sec/keylib/archive/refs/tags/0.7.0.tar.gz",
-            .hash = "keylib-0.7.0-mbYjk6qaCQACutrMpyhgstSmYxSKmcuRmLI-CJSumBeA",
-        },
         .uuid = .{
-            .url = "https://github.com/r4gus/uuid-zig/archive/refs/tags/0.4.0.tar.gz",
+            .url = "https://codeberg.org/r4gus/uuid-zig/archive/0.4.0.tar.gz",
             .hash = "uuid-0.4.0-oOieIR2AAAChAUVBY4ABjYI1XN0EbVALmiN0JIlggC3i",
         },
         .kdbx = .{
-            .url = "https://github.com/Zig-Sec/kdbx/archive/refs/tags/0.2.3.tar.gz",
-            .hash = "kdbx-0.2.3-eJXZBJWkEgDQRsIA_22SQSygPD6WlqEbjW83djSNqjQN",
+            .url = "https://codeberg.org/r4gus/kdbx/archive/0.3.0.tar.gz",
+            .hash = "kdbx-0.3.0-eJXZBB60EgD31lwTT6W_AZe90MyPhoteRL2Z_xQpeHHl",
+        },
+        .keylib = .{
+            .url = "git+https://codeberg.org/r4gus/keylib#d64e4eea12d499e1f35ae4d16689a2d201caa60b",
+            .hash = "keylib-0.8.0-mbYjk8CdCQAy-NYSxVrK7G6CsC8Kh57m3xiclJYhWooD",
         },
     },
     .paths = .{
