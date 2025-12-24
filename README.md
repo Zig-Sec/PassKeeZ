@@ -1,11 +1,10 @@
 ![Screenshot from 2025-04-15 11-16-56](https://github.com/user-attachments/assets/2ed6b32a-92d9-4fca-88ce-56f1e7b521ff)
 
-![GitHub](https://img.shields.io/github/license/Zig-Sec/PassKeeZ?style=flat-square)
-<noscript><a href="https://liberapay.com/r4gus/donate"><img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg"></a></noscript>
+<a href="https://liberapay.com/r4gus/donate"><img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg"></a>
 
-PassKeeZ is a Passkey (FIDO2) compatible authenticator for Linux based on [keylib](https://github.com/r4gus/keylib).
+PassKeeZ is a Passkey (FIDO2) compatible authenticator for Linux based on [keylib](https://codeberg.org/r4gus/keylib).
 
-**To get started, please visit the [Wiki](https://github.com/Zig-Sec/PassKeeZ/wiki)**. The video below shows the full installation via the installer script.
+**To get started, please visit the [Wiki](https://codeberg.org/r4gus/PassKeeZ/wiki)**. The video below shows the full installation via the installer script.
 
 [![Installing PassKeeZ Video](https://img.youtube.com/vi/_Z2yj9kszvU/0.jpg)](https://www.youtube.com/watch?v=_Z2yj9kszvU)
 
@@ -35,7 +34,7 @@ The project currently supports only Linux due to the absence of a standardized A
 
 ## Getting Started 
 
-To get started please visit the [wiki](https://github.com/Zig-Sec/PassKeeZ/wiki/Installing-PassKeeZ).  
+To get started please visit the [wiki](https://codeberg.org/r4gus/PassKeeZ/wiki/Installing-PassKeeZ).  
 
 ### Database Management
 
@@ -85,7 +84,7 @@ The primary objective of this project is to furnish an alternative —keeping in
 
 <details>
 <summary><ins>What is FIDO2/ Passkey?</ins></summary>
-Please read the QA of the [keylib](https://github.com/r4gus/keylib) project.
+Please read the QA of the [keylib](https://codeberg.org/r4gus/keylib) project.
 </details>
 
 <!--
