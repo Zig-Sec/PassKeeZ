@@ -1,7 +1,7 @@
 #!/bin/bash
 
-PASSKEEZ_VERSION="0.6.2"
-ZIGENITY_VERSION="0.6.0"
+PASSKEEZ_VERSION="0.6.3"
+ZIGENITY_VERSION="0.7.1"
 ZIG_VERSION="0.15.1"
 
 RED='\033[0;31m'
@@ -78,13 +78,11 @@ function check_dependencies {
 }
 
 function install_passkeez {
-    #curl -L -# -C - -o "/usr/local/bin/passkeez" "https://github.com/r4gus/keypass/releases/download/$PASSKEEZ_VERSION/passkeez-linux-$ARCH-$PASSKEEZ_VERSION"
-    #chmod +x /usr/local/bin/passkeez
     cd /tmp
 
     # Install the application
     if [ ! -d "./PassKeeZ" ]; then
-        git clone https://github.com/Zig-Sec/PassKeeZ --branch $PASSKEEZ_VERSION
+        git clone https://codeberg.org/r4gus/PassKeeZ --branch $PASSKEEZ_VERSION
     fi
     cd PassKeeZ
     ../$1 build -Doptimize=ReleaseSmall
@@ -101,17 +99,14 @@ function install_passkeez {
     # systemctl --user status passkeez.service
     #cp script/passkeez.service /etc/systemd/user/passkeez.service
     mkdir -p /home/${SUDO_USER}/.local/share/systemd/user
-    curl -L -# -C - -o "/home/${SUDO_USER}/.local/share/systemd/user/passkeez.service" "https://raw.githubusercontent.com/r4gus/keypass/refs/heads/master/script/passkeez.service"
+    curl -L -# -C - -o "/home/${SUDO_USER}/.local/share/systemd/user/passkeez.service" "https://codeberg.org/r4gus/PassKeeZ/raw/branch/master/script/passkeez.service"
 }
 
 function install_zigenity {
-    #curl -L -# -C - -o "/usr/local/bin/zigenity" "https://github.com/r4gus/keypass/releases/download/$PASSKEEZ_VERSION/zigenity-linux-$ARCH-$PASSKEEZ_VERSION"
-    #chmod +x /usr/local/bin/zigenity
-
     cd /tmp
 
     if [ ! -d "./zigenity" ]; then
-        git clone https://github.com/r4gus/zigenity --branch $ZIGENITY_VERSION
+        git clone https://codeberg.org/r4gus/zigenity --branch $ZIGENITY_VERSION
     fi
 
     cd zigenity
@@ -134,7 +129,7 @@ function check_config_folder {
 
 function postinst {
     # Create a new (system) group called fido
-    # - for explanation why a system group see: https://github.com/Zig-Sec/PassKeeZ/issues/21
+    # - for explanation why a system group see: https://codeberg.org/r4gus/PassKeeZ/issues/21
     getent group fido || (groupadd -r fido && usermod -a -G fido $SUDO_USER)
 
     # Add uhid to the list of modules to load during boot
@@ -258,7 +253,7 @@ if [ "$MODE" = "Installer" ]; then
     echo -e "    ${YELLOW}systemctl --user stop passkeez.service${NC}"
     echo "To disable PassKeeZ run:"
     echo -e "    ${YELLOW}systemctl --user disable passkeez.service${NC}"
-    echo "For further details visit https://github.com/Zig-Sec/PassKeeZ/wiki"
+    echo "For further details visit https://codeberg.org/r4gus/PassKeeZ/wiki"
     echo -e "${YELLOW}If this is the first time running this script, please reboot...${NC}"
 else
     echo "Uninstalling PassKeeZ..."
