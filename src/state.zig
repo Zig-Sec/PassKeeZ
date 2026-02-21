@@ -1,6 +1,6 @@
 const std = @import("std");
 const Database = @import("Database.zig");
-const Config = @import("database/Config.zig");
+const Config = @import("Config.zig");
 const keylib = @import("keylib");
 const UpResult = keylib.ctap.authenticator.callbacks.UpResult;
 const UvResult = keylib.ctap.authenticator.callbacks.UvResult;
@@ -26,18 +26,9 @@ const tout1: i64 = 10; // seconds
 const tout2: i64 = 60; // seconds
 
 pub fn init(a: std.mem.Allocator) !void {
-    conf = Config.load(a) catch |e| blk: {
+    conf = Config.load(a) catch |e| {
         std.log.err("unable to load configuration file ({any})", .{e});
-        Config.create(a) catch |e2| {
-            std.log.err("unable to create configuration file ({any})", .{e2});
-            return e2;
-        };
-        const conf_ = Config.load(a) catch |e2| {
-            std.log.err("unable to load configuration file after new database creation ({any})", .{e2});
-            return e2;
-        };
-        std.log.info("Configuration file created", .{});
-        break :blk conf_;
+        return e;
     };
 }
 
