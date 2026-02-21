@@ -11,7 +11,7 @@ pub var config: Config = undefined;
 pub const dvui_app: dvui.App = .{
     .config = .{
         .options = .{
-            .size = .{ .w = 800.0, .h = 600.0 },
+            .size = .{ .w = 1600.0, .h = 900.0 },
             .min_size = .{ .w = 250.0, .h = 350.0 },
             .title = "PassKeeZ",
             .window_init_options = .{
@@ -92,7 +92,7 @@ pub fn frame() !dvui.App.Result {
             .{
                 .expand = .horizontal,
                 .background = true,
-                .color_fill = .fromHex("373737"),
+                //.color_fill = .fromHex("373737"),
             },
         );
         defer m.deinit();
@@ -129,16 +129,17 @@ pub fn frame() !dvui.App.Result {
     }
 
     if (dvui.dataGetPtr(null, uId, "database", kdbx.Database) != null) {
+        // Show the "data-browser" if the database has been unlocked.
         var outer_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
         defer outer_hbox.deinit();
 
+        // The side pannel manely shows the group tree view
         try sidePannel(window, uId);
 
-        // TODO: put here the main element
+        // The entry table shows the entries for the selected group
         EntryTable.draw(uId);
-
-        // Those window functions will return if the show window flag is not set
     } else {
+        // Show the unlock screen if no database hase been unlocked.
         try loginWidget(uId);
     }
 

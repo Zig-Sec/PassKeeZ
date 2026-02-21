@@ -3,7 +3,6 @@ const builtin = @import("builtin");
 const dvui = @import("dvui");
 const kdbx = @import("kdbx");
 const root = @import("root");
-const clipboard = @import("clipboard");
 
 pub fn draw(uniqueId: dvui.Id) void {
     const local = struct {
@@ -194,7 +193,7 @@ pub fn draw(uniqueId: dvui.Id) void {
                     defer fw2.deinit();
 
                     if (dvui.menuItemLabel(@src(), "Copy Username", .{}, .{ .expand = .horizontal }) != null) {
-                        clipboard.write("hello") catch {};
+                        //clipboard.write("hello") catch {};
                         ctext.close();
                         //if (grid.pointToCell(cp.)) |cell| {
                         //    const e = group.entries.items[cell.row_num];
