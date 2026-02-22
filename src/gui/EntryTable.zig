@@ -50,6 +50,10 @@ pub fn draw(uniqueId: dvui.Id) void {
                 .advanced => "Advanced",
             };
         }
+
+        // Timer for clipboard
+        var cb_seconds_remaining: ?i8 = null;
+        var cb_ts: ?i64 = null;
     };
 
     var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
@@ -58,14 +62,51 @@ pub fn draw(uniqueId: dvui.Id) void {
     // Status bar at the bottom
     {
         var sbox = dvui.box(@src(), .{
-            //.dir = .vertical,
+            .dir = .horizontal,
         }, .{
             .min_size_content = .{ .h = 30 },
-            .expand = .both,
+            .expand = .horizontal,
             .border = dvui.Rect.all(1),
             .gravity_y = 1.0,
         });
         defer sbox.deinit();
+
+        var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
+        defer scroll.deinit();
+
+        if (dvui.dataGet(null, uniqueId, "group", *kdbx.Group)) |group| {
+            dvui.label(@src(), "Selected Group: {s}, #Entries: {d}", .{ group.name, group.entries.items.len }, .{
+                .gravity_y = 0.5,
+            });
+        }
+
+        if (local.cb_seconds_remaining) |*rem| blk: {
+            const curr = std.time.timestamp();
+            if (curr >= local.cb_ts.? + rem.*) {
+                local.cb_seconds_remaining = null;
+                local.cb_ts = null;
+                dvui.clipboardTextSet("\x00"); // empty clip board
+                break :blk;
+            }
+
+            const millis = @divFloor(dvui.frameTimeNS(), 1_000_000);
+            const left = @as(i32, @intCast(@rem(millis, 1000)));
+
+            {
+                var mslabel = dvui.LabelWidget.init(@src(), "Clipboard: {d}s", .{local.cb_ts.? + rem.* - curr}, .{}, .{
+                    .gravity_x = 1.0,
+                    .gravity_y = 0.5,
+                });
+                defer mslabel.deinit();
+
+                mslabel.draw();
+
+                if (dvui.timerDoneOrNone(mslabel.data().id)) {
+                    const wait = 1000 * (1000 - left);
+                    dvui.timer(mslabel.data().id, wait);
+                }
+            }
+        }
     }
 
     // This is the context window for an entry which is placed on the bottom
@@ -268,6 +309,8 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
                     )) {
                         dvui.clipboardTextSet(v);
                         dvui.toast(@src(), .{ .message = "Username copied to clipboard" });
+                        local.cb_seconds_remaining = 20;
+                        local.cb_ts = std.time.timestamp();
                     }
                     dvui.tooltip(@src(), .{ .active_rect = ttout.borderRectScale().r }, "Copy Username to clipboard", .{}, .{});
                 }
@@ -327,6 +370,8 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
                     )) {
                         dvui.clipboardTextSet(v);
                         dvui.toast(@src(), .{ .message = "Password copied to clipboard" });
+                        local.cb_seconds_remaining = 20;
+                        local.cb_ts = std.time.timestamp();
                     }
                     dvui.tooltip(@src(), .{ .active_rect = ttout.borderRectScale().r }, "Copy password to clipboard", .{}, .{});
                 }
