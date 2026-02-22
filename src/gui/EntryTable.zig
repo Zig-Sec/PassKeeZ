@@ -115,8 +115,8 @@ pub fn draw(uniqueId: dvui.Id) void {
         var tbox = dvui.box(@src(), .{
             //.dir = .vertical,
         }, .{
-            .min_size_content = .{ .h = 240 },
-            .expand = .both,
+            .min_size_content = .{ .h = 340 },
+            .expand = .horizontal,
             .border = dvui.Rect.all(1),
             .gravity_y = 1.0,
         });
@@ -374,6 +374,34 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
                         local.cb_ts = std.time.timestamp();
                     }
                     dvui.tooltip(@src(), .{ .active_rect = ttout.borderRectScale().r }, "Copy password to clipboard", .{}, .{});
+                }
+            }
+
+            {
+                var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+                defer inner_hbox.deinit();
+
+                dvui.label(
+                    @src(),
+                    "Notes",
+                    .{},
+                    .{
+                        .gravity_y = 0.5,
+                    },
+                );
+
+                left_alignment.spacer(@src(), 0);
+
+                if (entry.get("Notes")) |v| blk2: {
+                    if (v.len == 0) break :blk2;
+
+                    var notes_scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both });
+                    defer notes_scroll.deinit();
+
+                    var tl = dvui.textLayout(@src(), .{}, .{ .expand = .both });
+                    defer tl.deinit();
+
+                    tl.addText(v, .{});
                 }
             }
         }
