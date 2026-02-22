@@ -348,7 +348,7 @@ pub fn sidePannel(
 pub fn loginWidget(uniqueId: dvui.Id) !void {
     const local = struct {
         var password: [128]u8 = .{0} ** 128;
-        var path: [256]u8 = .{0} ** 256;
+        var path: [4096]u8 = .{0} ** 4096;
         var spinner_active: bool = false;
 
         pub fn setPath(p: []const u8) void {
@@ -363,12 +363,16 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
 
         var first: bool = true;
 
-        pub fn setTestData() void {}
+        pub fn setData() void {
+            @memcpy(&path, config.db_path);
+        }
     };
+
+    var enter_pressed = false;
 
     if (local.first) {
         local.first = false;
-        local.setTestData();
+        local.setData();
     }
 
     var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
@@ -466,6 +470,11 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
                     .gravity_y = 0.5,
                 },
             );
+
+            // Check if the user pressed enter. We treat this the same as clicking the
+            // button below.
+            enter_pressed = te.enter_pressed;
+
             te.deinit();
         }
 
@@ -480,7 +489,7 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
         } else {
             if (dvui.button(@src(), "unlock", .{}, .{
                 .expand = .horizontal,
-            })) blk: {
+            }) or enter_pressed) blk: {
                 local.spinner_active = true;
 
                 const bg_thread = std.Thread.spawn(
