@@ -74,26 +74,27 @@ pub fn draw(uniqueId: dvui.Id) void {
                     var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
                     defer inner_hbox.deinit();
 
-                    dvui.label(@src(), "User Name", .{}, .{});
+                    dvui.label(
+                        @src(),
+                        "User Name",
+                        .{},
+                        .{
+                            .gravity_y = 0.5,
+                        },
+                    );
                     left_alignment.spacer(@src(), 0);
 
-                    dvui.label(@src(), "{s}", .{
-                        if (entry.get("UserName")) |v| v else "",
-                    }, .{});
-                }
-
-                {
-                    var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
-                    defer inner_hbox.deinit();
-
-                    dvui.label(@src(), "URL", .{}, .{});
-                    left_alignment.spacer(@src(), 0);
-
-                    if (entry.get("URL")) |url| {
-                        dvui.link(@src(), .{
-                            .label = url,
-                            .url = url,
-                        }, .{});
+                    if (entry.get("UserName")) |v| {
+                        if (dvui.button(
+                            @src(),
+                            v,
+                            .{},
+                            .{
+                                .gravity_y = 0.5,
+                            },
+                        )) {
+                            dvui.clipboardTextSet(v);
+                        }
                     }
                 }
 
@@ -101,11 +102,53 @@ pub fn draw(uniqueId: dvui.Id) void {
                     var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
                     defer inner_hbox.deinit();
 
-                    dvui.label(@src(), "Password", .{}, .{});
+                    dvui.label(
+                        @src(),
+                        "URL",
+                        .{},
+                        .{
+                            .gravity_y = 0.5,
+                        },
+                    );
+                    left_alignment.spacer(@src(), 0);
+
+                    if (entry.get("URL")) |url| {
+                        dvui.link(@src(), .{
+                            .label = url,
+                            .url = url,
+                        }, .{
+                            .gravity_y = 0.5,
+                        });
+                    }
+                }
+
+                {
+                    var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+                    defer inner_hbox.deinit();
+
+                    dvui.label(
+                        @src(),
+                        "Password",
+                        .{},
+                        .{
+                            .gravity_y = 0.5,
+                        },
+                    );
 
                     left_alignment.spacer(@src(), 0);
 
-                    dvui.label(@src(), "*****", .{}, .{});
+                    if (entry.get("Password")) |v| {
+                        if (dvui.button(
+                            @src(),
+                            "*****",
+                            .{},
+                            .{
+                                .gravity_y = 0.5,
+                            },
+                        )) {
+                            dvui.clipboardTextSet(v);
+                        }
+                    }
                 }
             }
         }
@@ -193,6 +236,7 @@ pub fn draw(uniqueId: dvui.Id) void {
                     defer fw2.deinit();
 
                     if (dvui.menuItemLabel(@src(), "Copy Username", .{}, .{ .expand = .horizontal }) != null) {
+                        dvui.clipboardTextSet("hello");
                         //clipboard.write("hello") catch {};
                         ctext.close();
                         //if (grid.pointToCell(cp.)) |cell| {

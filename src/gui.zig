@@ -470,6 +470,10 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
                     .gravity_y = 0.5,
                 },
             );
+            // Fucus on the password entry
+            if (dvui.firstFrame(te.data().id)) {
+                dvui.focusWidget(te.data().id, null, null);
+            }
 
             // Check if the user pressed enter. We treat this the same as clicking the
             // button below.
