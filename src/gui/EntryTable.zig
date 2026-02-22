@@ -84,7 +84,9 @@ pub fn draw(uniqueId: dvui.Id) void {
                     );
                     left_alignment.spacer(@src(), 0);
 
-                    if (entry.get("UserName")) |v| {
+                    if (entry.get("UserName")) |v| blk2: {
+                        if (v.len == 0) break :blk2;
+
                         if (dvui.button(
                             @src(),
                             v,
@@ -137,7 +139,9 @@ pub fn draw(uniqueId: dvui.Id) void {
 
                     left_alignment.spacer(@src(), 0);
 
-                    if (entry.get("Password")) |v| {
+                    if (entry.get("Password")) |v| blk2: {
+                        if (v.len == 0) break :blk2;
+
                         if (dvui.button(
                             @src(),
                             "*****",
