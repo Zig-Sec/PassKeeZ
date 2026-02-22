@@ -136,13 +136,14 @@ pub fn draw(uniqueId: dvui.Id) void {
 
         switch (local.active_grid) {
             .general => try drawGeneral(uniqueId, &local),
-            .advanced => {},
+            .advanced => try drawAdvanced(uniqueId, &local),
         }
     }
 
     // The list of entries of a group.
     {
         var grid = dvui.grid(@src(), .colWidths(&local.col_widths), .{}, .{
+            .min_size_content = .{ .h = 530 },
             .expand = .both,
             .background = true,
             .border = dvui.Rect.all(2),
@@ -247,6 +248,86 @@ pub fn draw(uniqueId: dvui.Id) void {
                         //std.debug.print("klicked {d}\n", .{cell.row_num});
                         local.selected_entry_id = cell.row_num;
                         local.selected_entry_guuid = group.uuid;
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn drawAdvanced(uniqueId: dvui.Id, local: anytype) !void {
+    const local2 = struct {
+        // Title, Username, URL, Last Modified
+        const num_cols = 2;
+        const equal_spacing = [num_cols]f32{ -1, -1 };
+        var col_widths: [num_cols]f32 = @splat(100); // Default width to 100
+    };
+
+    var hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
+    defer hbox.deinit();
+
+    {
+        var grid = dvui.grid(@src(), .colWidths(&local2.col_widths), .{}, .{
+            .expand = .both,
+            .background = true,
+            .border = dvui.Rect.all(2),
+        });
+        defer grid.deinit();
+
+        var banded: dvui.GridWidget.CellStyle.HoveredRow = .{
+            .cell_opts = .{
+                .background = true,
+                .color_fill_hover = dvui.themeGet().color(.control, .fill_hover),
+            },
+        };
+        banded.processEvents(grid);
+
+        const col_widths_src = local2.equal_spacing;
+
+        dvui.columnLayoutProportional(
+            &col_widths_src,
+            &local2.col_widths,
+            grid.data().contentRect().w,
+        );
+
+        dvui.gridHeading(@src(), grid, 0, "Key", local.headerResizeOptions(grid, 0), .{});
+        dvui.gridHeading(@src(), grid, 1, "Value", local.headerResizeOptions(grid, 1), .{});
+
+        if (local.selected_entry_id) |eid| blk: {
+            if (dvui.dataGet(null, uniqueId, "group", *kdbx.Group)) |group| {
+                // Make sure the group hasn't changed and the index is not out of bounds.
+                if (local.selected_entry_guuid != group.uuid or eid >= group.entries.items.len) {
+                    local.selected_entry_id = null;
+                    break :blk;
+                }
+
+                const entry = group.entries.items[eid];
+
+                for (entry.strings.items, 0..) |kv, row_num| {
+                    var cell: dvui.GridWidget.Cell = .colRow(0, row_num);
+
+                    {
+                        defer cell.col_num += 1;
+                        var cell_box = grid.bodyCell(@src(), cell, banded.cellOptions(cell));
+                        defer cell_box.deinit();
+                        dvui.labelNoFmt(
+                            @src(),
+                            kv.key,
+                            .{},
+                            banded.options(cell),
+                        );
+                    }
+
+                    {
+                        defer cell.col_num += 1;
+                        var cell_box = grid.bodyCell(@src(), cell, banded.cellOptions(cell));
+                        defer cell_box.deinit();
+                        dvui.labelNoFmt(
+                            @src(),
+                            kv.value,
+                            .{},
+                            banded.options(cell),
+                        );
                     }
                 }
             }

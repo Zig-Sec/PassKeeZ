@@ -12,7 +12,7 @@ pub const dvui_app: dvui.App = .{
     .config = .{
         .options = .{
             .size = .{ .w = 1600.0, .h = 900.0 },
-            .min_size = .{ .w = 250.0, .h = 350.0 },
+            .min_size = .{ .w = 1000.0, .h = 600.0 },
             .title = "PassKeeZ",
             .window_init_options = .{
                 // Could set a default theme here
