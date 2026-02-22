@@ -5,6 +5,12 @@ const kdbx = @import("kdbx");
 const root = @import("root");
 
 pub fn draw(uniqueId: dvui.Id) void {
+    const GridType = enum {
+        general,
+        advanced,
+        const num_grids = @typeInfo(@This()).@"enum".fields.len;
+    };
+
     const local = struct {
         // Title, Username, URL, Last Modified
         const num_cols = 3;
@@ -25,139 +31,75 @@ pub fn draw(uniqueId: dvui.Id) void {
             };
         }
 
+        // This is filled if a entry is clicked.
+        // It determines which entry should be shown.
         var selected_entry_id: ?usize = null;
         var selected_entry_guuid: ?u128 = null;
+
+        // This cotrols which kind of information is displayed
+        // for a selected entry.
+        var active_grid: GridType = .general;
+
+        fn tabSelected(grid_type: GridType) bool {
+            return active_grid == grid_type;
+        }
+
+        fn tabName(grid_type: GridType) []const u8 {
+            return switch (grid_type) {
+                .general => "General",
+                .advanced => "Advanced",
+            };
+        }
     };
 
     var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
     defer vbox.deinit();
 
-    // This is the context window for an entry which is placed on the bottom
-    // (below the table).
+    // Status bar at the bottom
     {
-        var outer_vbox = dvui.box(@src(), .{
-            .dir = .vertical,
+        var sbox = dvui.box(@src(), .{
+            //.dir = .vertical,
         }, .{
-            .min_size_content = .{ .h = 180 },
+            .min_size_content = .{ .h = 30 },
             .expand = .both,
             .border = dvui.Rect.all(1),
             .gravity_y = 1.0,
         });
-        defer outer_vbox.deinit();
+        defer sbox.deinit();
+    }
 
-        var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
-        defer scroll.deinit();
+    // This is the context window for an entry which is placed on the bottom
+    // (below the table).
+    {
+        var tbox = dvui.box(@src(), .{
+            //.dir = .vertical,
+        }, .{
+            .min_size_content = .{ .h = 240 },
+            .expand = .both,
+            .border = dvui.Rect.all(1),
+            .gravity_y = 1.0,
+        });
+        defer tbox.deinit();
 
-        if (local.selected_entry_id) |eid| blk: {
-            if (dvui.dataGet(null, uniqueId, "group", *kdbx.Group)) |group| {
-                // Make sure the group hasn't changed and the index is not out of bounds.
-                if (local.selected_entry_guuid != group.uuid or eid >= group.entries.items.len) {
-                    local.selected_entry_id = null;
-                    break :blk;
-                }
+        {
+            var tabs = dvui.tabs(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+            defer tabs.deinit();
+            for (0..GridType.num_grids) |tab_num| {
+                const this_tab: GridType = @enumFromInt(tab_num);
 
-                const entry = group.entries.items[eid];
-
-                dvui.label(
-                    @src(),
-                    "{s}",
-                    .{
-                        if (entry.get("Title")) |v| v else "",
-                    },
-                    .{},
-                );
-
-                var left_alignment = dvui.Alignment.init(@src(), 0);
-                defer left_alignment.deinit();
-
-                {
-                    var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
-                    defer inner_hbox.deinit();
-
-                    dvui.label(
-                        @src(),
-                        "User Name",
-                        .{},
-                        .{
-                            .gravity_y = 0.5,
-                        },
-                    );
-                    left_alignment.spacer(@src(), 0);
-
-                    if (entry.get("UserName")) |v| blk2: {
-                        if (v.len == 0) break :blk2;
-
-                        if (dvui.button(
-                            @src(),
-                            v,
-                            .{},
-                            .{
-                                .gravity_y = 0.5,
-                            },
-                        )) {
-                            dvui.clipboardTextSet(v);
-                        }
-                    }
-                }
-
-                {
-                    var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
-                    defer inner_hbox.deinit();
-
-                    dvui.label(
-                        @src(),
-                        "URL",
-                        .{},
-                        .{
-                            .gravity_y = 0.5,
-                        },
-                    );
-                    left_alignment.spacer(@src(), 0);
-
-                    if (entry.get("URL")) |url| {
-                        dvui.link(@src(), .{
-                            .label = url,
-                            .url = url,
-                        }, .{
-                            .gravity_y = 0.5,
-                        });
-                    }
-                }
-
-                {
-                    var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
-                    defer inner_hbox.deinit();
-
-                    dvui.label(
-                        @src(),
-                        "Password",
-                        .{},
-                        .{
-                            .gravity_y = 0.5,
-                        },
-                    );
-
-                    left_alignment.spacer(@src(), 0);
-
-                    if (entry.get("Password")) |v| blk2: {
-                        if (v.len == 0) break :blk2;
-
-                        if (dvui.button(
-                            @src(),
-                            "*****",
-                            .{},
-                            .{
-                                .gravity_y = 0.5,
-                            },
-                        )) {
-                            dvui.clipboardTextSet(v);
-                        }
-                    }
+                if (tabs.addTabLabel(local.tabSelected(this_tab), local.tabName(this_tab))) {
+                    local.active_grid = this_tab;
                 }
             }
         }
+
+        switch (local.active_grid) {
+            .general => try drawGeneral(uniqueId, &local),
+            .advanced => {},
+        }
     }
 
+    // The list of entries of a group.
     {
         var grid = dvui.grid(@src(), .colWidths(&local.col_widths), .{}, .{
             .expand = .both,
@@ -264,6 +206,120 @@ pub fn draw(uniqueId: dvui.Id) void {
                         //std.debug.print("klicked {d}\n", .{cell.row_num});
                         local.selected_entry_id = cell.row_num;
                         local.selected_entry_guuid = group.uuid;
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
+    var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
+    defer scroll.deinit();
+
+    if (local.selected_entry_id) |eid| blk: {
+        if (dvui.dataGet(null, uniqueId, "group", *kdbx.Group)) |group| {
+            // Make sure the group hasn't changed and the index is not out of bounds.
+            if (local.selected_entry_guuid != group.uuid or eid >= group.entries.items.len) {
+                local.selected_entry_id = null;
+                break :blk;
+            }
+
+            const entry = group.entries.items[eid];
+
+            dvui.label(
+                @src(),
+                "{s}",
+                .{
+                    if (entry.get("Title")) |v| v else "",
+                },
+                .{},
+            );
+
+            var left_alignment = dvui.Alignment.init(@src(), 0);
+            defer left_alignment.deinit();
+
+            {
+                var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+                defer inner_hbox.deinit();
+
+                dvui.label(
+                    @src(),
+                    "User Name",
+                    .{},
+                    .{
+                        .gravity_y = 0.5,
+                    },
+                );
+                left_alignment.spacer(@src(), 0);
+
+                if (entry.get("UserName")) |v| blk2: {
+                    if (v.len == 0) break :blk2;
+
+                    if (dvui.button(
+                        @src(),
+                        v,
+                        .{},
+                        .{
+                            .gravity_y = 0.5,
+                        },
+                    )) {
+                        dvui.clipboardTextSet(v);
+                    }
+                }
+            }
+
+            {
+                var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+                defer inner_hbox.deinit();
+
+                dvui.label(
+                    @src(),
+                    "URL",
+                    .{},
+                    .{
+                        .gravity_y = 0.5,
+                    },
+                );
+                left_alignment.spacer(@src(), 0);
+
+                if (entry.get("URL")) |url| {
+                    dvui.link(@src(), .{
+                        .label = url,
+                        .url = url,
+                    }, .{
+                        .gravity_y = 0.5,
+                    });
+                }
+            }
+
+            {
+                var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+                defer inner_hbox.deinit();
+
+                dvui.label(
+                    @src(),
+                    "Password",
+                    .{},
+                    .{
+                        .gravity_y = 0.5,
+                    },
+                );
+
+                left_alignment.spacer(@src(), 0);
+
+                if (entry.get("Password")) |v| blk2: {
+                    if (v.len == 0) break :blk2;
+
+                    if (dvui.button(
+                        @src(),
+                        "*****",
+                        .{},
+                        .{
+                            .gravity_y = 0.5,
+                        },
+                    )) {
+                        dvui.clipboardTextSet(v);
                     }
                 }
             }
