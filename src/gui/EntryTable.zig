@@ -256,16 +256,20 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
                 if (entry.get("UserName")) |v| blk2: {
                     if (v.len == 0) break :blk2;
 
+                    var ttout: dvui.WidgetData = undefined;
                     if (dvui.button(
                         @src(),
                         v,
                         .{},
                         .{
                             .gravity_y = 0.5,
+                            .data_out = &ttout,
                         },
                     )) {
                         dvui.clipboardTextSet(v);
+                        dvui.toast(@src(), .{ .message = "Username copied to clipboard" });
                     }
+                    dvui.tooltip(@src(), .{ .active_rect = ttout.borderRectScale().r }, "Copy Username to clipboard", .{}, .{});
                 }
             }
 
@@ -311,16 +315,20 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
                 if (entry.get("Password")) |v| blk2: {
                     if (v.len == 0) break :blk2;
 
+                    var ttout: dvui.WidgetData = undefined;
                     if (dvui.button(
                         @src(),
                         "*****",
                         .{},
                         .{
                             .gravity_y = 0.5,
+                            .data_out = &ttout,
                         },
                     )) {
                         dvui.clipboardTextSet(v);
+                        dvui.toast(@src(), .{ .message = "Password copied to clipboard" });
                     }
+                    dvui.tooltip(@src(), .{ .active_rect = ttout.borderRectScale().r }, "Copy password to clipboard", .{}, .{});
                 }
             }
         }
