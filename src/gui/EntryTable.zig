@@ -54,6 +54,9 @@ pub fn draw(uniqueId: dvui.Id) void {
         // Timer for clipboard
         var cb_seconds_remaining: ?i8 = null;
         var cb_ts: ?i64 = null;
+
+        // Buffer for search box
+        var search: [128]u8 = .{0} ** 128;
     };
 
     var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
@@ -112,10 +115,9 @@ pub fn draw(uniqueId: dvui.Id) void {
     // This is the context window for an entry which is placed on the bottom
     // (below the table).
     {
-        var tbox = dvui.box(@src(), .{
-            //.dir = .vertical,
-        }, .{
-            .min_size_content = .{ .h = 340 },
+        var tbox = dvui.box(@src(), .{}, .{
+            .min_size_content = .{ .h = 360 },
+            .max_size_content = .height(360),
             .expand = .horizontal,
             .border = dvui.Rect.all(1),
             .gravity_y = 1.0,
@@ -263,8 +265,8 @@ fn drawAdvanced(uniqueId: dvui.Id, local: anytype) !void {
         var col_widths: [num_cols]f32 = @splat(100); // Default width to 100
     };
 
-    var hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
-    defer hbox.deinit();
+    var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
+    defer scroll.deinit();
 
     {
         var grid = dvui.grid(@src(), .colWidths(&local2.col_widths), .{}, .{
@@ -322,12 +324,9 @@ fn drawAdvanced(uniqueId: dvui.Id, local: anytype) !void {
                         defer cell.col_num += 1;
                         var cell_box = grid.bodyCell(@src(), cell, banded.cellOptions(cell));
                         defer cell_box.deinit();
-                        dvui.labelNoFmt(
-                            @src(),
-                            kv.value,
-                            .{},
-                            banded.options(cell),
-                        );
+                        var text = dvui.textLayout(@src(), .{ .break_lines = true }, .{ .background = false });
+                        defer text.deinit();
+                        text.addText(kv.value, banded.options(cell));
                     }
                 }
             }
