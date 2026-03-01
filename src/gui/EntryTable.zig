@@ -4,7 +4,10 @@ const dvui = @import("dvui");
 const kdbx = @import("kdbx");
 const root = @import("root");
 
-pub fn draw(uniqueId: dvui.Id) void {
+pub fn draw(
+    uniqueId: dvui.Id,
+    allocator: std.mem.Allocator,
+) !void {
     const GridType = enum {
         general,
         advanced,
@@ -35,6 +38,8 @@ pub fn draw(uniqueId: dvui.Id) void {
         // It determines which entry should be shown.
         var selected_entry_id: ?usize = null;
         var selected_entry_guuid: ?u128 = null;
+        var index_map: std.AutoHashMapUnmanaged(usize, usize) = .empty;
+        var row_num: usize = 0;
 
         // This cotrols which kind of information is displayed
         // for a selected entry.
@@ -78,7 +83,7 @@ pub fn draw(uniqueId: dvui.Id) void {
         defer scroll.deinit();
 
         if (dvui.dataGet(null, uniqueId, "group", *kdbx.Group)) |group| {
-            dvui.label(@src(), "Selected Group: {s}, #Entries: {d}", .{ group.name, group.entries.items.len }, .{
+            dvui.label(@src(), "Selected Group: {s}, #Entries: {d}", .{ group.name, local.row_num }, .{
                 .gravity_y = 0.5,
             });
         }
@@ -172,10 +177,21 @@ pub fn draw(uniqueId: dvui.Id) void {
         dvui.gridHeading(@src(), grid, 1, "Username", local.headerResizeOptions(grid, 1), .{});
         dvui.gridHeading(@src(), grid, 2, "URL", local.headerResizeOptions(grid, 2), .{});
 
+        const searchText = dvui.dataGetSlice(null, uniqueId, "searchText", []const u8) orelse "";
+
         // for loop
         if (dvui.dataGet(null, uniqueId, "group", *kdbx.Group)) |group| {
-            for (group.entries.items, 0..) |item, row_num| {
-                var cell: dvui.GridWidget.Cell = .colRow(0, row_num);
+            local.row_num = 0;
+            blk: for (group.entries.items, 0..) |item, eidx| {
+                const title = item.get("Title") orelse "";
+                const username = item.get("UserName") orelse "";
+                const url = item.get("URL") orelse "";
+
+                if (!searchTextMatchesEntry(item, searchText, allocator)) continue :blk;
+
+                var cell: dvui.GridWidget.Cell = .colRow(0, local.row_num);
+                try local.index_map.put(allocator, local.row_num, eidx);
+                defer local.row_num += 1;
 
                 {
                     defer cell.col_num += 1;
@@ -183,7 +199,7 @@ pub fn draw(uniqueId: dvui.Id) void {
                     defer cell_box.deinit();
                     dvui.labelNoFmt(
                         @src(),
-                        if (item.get("Title")) |name| name else "",
+                        title,
                         .{},
                         banded.options(cell),
                     );
@@ -195,7 +211,7 @@ pub fn draw(uniqueId: dvui.Id) void {
                     defer cell_box.deinit();
                     dvui.labelNoFmt(
                         @src(),
-                        if (item.get("UserName")) |name| name else "",
+                        username,
                         .{},
                         banded.options(cell),
                     );
@@ -207,7 +223,7 @@ pub fn draw(uniqueId: dvui.Id) void {
                     defer cell_box.deinit();
                     dvui.labelNoFmt(
                         @src(),
-                        if (item.get("URL")) |name| name else "",
+                        url,
                         .{},
                         banded.options(cell),
                     );
@@ -248,7 +264,7 @@ pub fn draw(uniqueId: dvui.Id) void {
                 if (e.evt == .mouse and e.evt.mouse.action == .press) {
                     if (grid.pointToCell(dvui.currentWindow().mouse_pt)) |cell| {
                         //std.debug.print("klicked {d}\n", .{cell.row_num});
-                        local.selected_entry_id = cell.row_num;
+                        local.selected_entry_id = local.index_map.get(cell.row_num);
                         local.selected_entry_guuid = group.uuid;
                     }
                 }
@@ -486,4 +502,44 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
             }
         }
     }
+}
+
+fn getEntryIndexFromRowNum(
+    group: *const kdbx.Group,
+    row_num: usize,
+    search: []const u8,
+    allocator: std.mem.Allocator,
+) ?usize {
+    if (group.entries.items.len >= row_num) return null;
+
+    var idx2: usize = 0;
+    for (group.entries.items, 0..) |e, idx| {
+        if (!searchTextMatchesEntry(e, search, allocator)) continue;
+        if (idx2 == row_num) return idx;
+        idx2 += 1;
+    }
+
+    return null;
+}
+
+fn searchTextMatchesEntry(e: kdbx.Entry, text: []const u8, allocator: std.mem.Allocator) bool {
+    if (text.len == 0) return true;
+
+    const title = e.get("Title") orelse "";
+    const username = e.get("UserName") orelse "";
+    const url = e.get("URL") orelse "";
+
+    var arr: std.ArrayListUnmanaged(u8) = .empty;
+    defer arr.deinit(allocator);
+    arr.appendSlice(allocator, title) catch return true;
+    arr.appendSlice(allocator, username) catch return true;
+    arr.appendSlice(allocator, url) catch return true;
+
+    for (arr.items) |*item| item.* = std.ascii.toLower(item.*);
+
+    if (std.mem.indexOf(u8, arr.items, text) != null) {
+        return true;
+    }
+
+    return false;
 }

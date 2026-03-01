@@ -137,7 +137,7 @@ pub fn frame() !dvui.App.Result {
         try sidePannel(window, uId);
 
         // The entry table shows the entries for the selected group
-        EntryTable.draw(uId);
+        try EntryTable.draw(uId, gpa);
     } else {
         // Show the unlock screen if no database hase been unlocked.
         try loginWidget(uId);
@@ -150,6 +150,11 @@ pub fn sidePannel(
     win: *dvui.Window,
     uniqueId: dvui.Id,
 ) !void {
+    const local = struct {
+        var searchBuffer: [128]u8 = .{0} ** 128;
+        var searchSlice: []u8 = searchBuffer[0..0];
+    };
+
     const icon_color: dvui.Color = .{ .r = 0x3c, .g = 0xa3, .b = 0x70, .a = 0xff };
 
     const recursor = struct {
@@ -234,23 +239,7 @@ pub fn sidePannel(
         }
     }.search;
 
-    const bopts: dvui.Options = .{
-        .margin = dvui.Rect.all(1),
-        .padding = dvui.Rect.all(2),
-    };
-    const eopts: dvui.Options = .{
-        .border = .{ .x = 1 },
-        .corner_radius = dvui.Rect.all(4),
-        .box_shadow = .{
-            .color = .black,
-            .offset = .{ .x = -5, .y = 5 },
-            .shrink = 5,
-            .fade = 10,
-            .alpha = 0.15,
-        },
-    };
-
-    var outer_vbox = dvui.box(@src(), .{}, .{
+    var outer_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
         .min_size_content = .{ .w = 250 },
         .max_size_content = .size(.{ .w = 250 }),
         .expand = .vertical,
@@ -259,87 +248,125 @@ pub fn sidePannel(
     });
     defer outer_vbox.deinit();
 
-    var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
-    defer scroll.deinit();
-
-    if (dvui.dataGetPtr(null, uniqueId, "database", kdbx.Database)) |db| {
-        var tree = dvui.TreeWidget.tree(
+    // Search Bar
+    {
+        var te = dvui.textEntry(
             @src(),
-            .{},
-            .{ .expand = .horizontal },
+            .{ .text = .{ .buffer = &local.searchBuffer } },
+            .{
+                .expand = .horizontal,
+            },
         );
-        defer tree.deinit();
+        te.deinit();
 
-        { // Root is always expanded
-            const branch = tree.branch(
+        const s = getSlice(&local.searchBuffer);
+        if (s.len != local.searchSlice.len or !std.mem.eql(u8, s, local.searchSlice)) {
+            local.searchSlice = local.searchBuffer[0..s.len];
+            for (local.searchSlice) |*item| item.* = std.ascii.toLower(item.*);
+            dvui.dataSetSlice(win, uniqueId, "searchText", local.searchSlice);
+        }
+    }
+
+    // Nav Bar for Groups
+    {
+        const bopts: dvui.Options = .{
+            .margin = dvui.Rect.all(1),
+            .padding = dvui.Rect.all(2),
+        };
+        const eopts: dvui.Options = .{
+            .border = .{ .x = 1 },
+            .corner_radius = dvui.Rect.all(4),
+            .box_shadow = .{
+                .color = .black,
+                .offset = .{ .x = -5, .y = 5 },
+                .shrink = 5,
+                .fade = 10,
+                .alpha = 0.15,
+            },
+        };
+
+        var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
+        defer scroll.deinit();
+
+        if (dvui.dataGetPtr(null, uniqueId, "database", kdbx.Database)) |db| {
+            var tree = dvui.TreeWidget.tree(
                 @src(),
-                .{
-                    .expanded = true,
-                },
+                .{},
                 .{ .expand = .horizontal },
             );
-            defer branch.deinit();
+            defer tree.deinit();
 
-            _ = dvui.icon(
-                @src(),
-                "FileIcon",
-                dvui.entypo.folder,
-                .{ .fill_color = icon_color },
-                .{
-                    .gravity_y = 0.5,
-                    .padding = dvui.Rect.all(4),
-                },
-            );
-            dvui.label(@src(), "{s}", .{"Root"}, .{
-                .color_text = dvui.themeGet().color(.control, .text),
-                .padding = dvui.Rect.all(4),
-            });
-            _ = dvui.icon(
-                @src(),
-                "DropIcon",
-                if (branch.expanded) dvui.entypo.triangle_down else dvui.entypo.triangle_right,
-                .{
-                    .fill_color = icon_color,
-                },
-                .{
-                    .gravity_y = 0.5,
-                    .gravity_x = 1.0,
-                    .padding = dvui.Rect.all(4),
-                },
-            );
-
-            if (branch.button.clicked()) {
-                dvui.dataSet(win, uniqueId, "group", &db.body.root);
-            }
-
-            if (branch.expander(
-                @src(),
-                .{ .indent = 14.0 },
-                .{
-                    .color_fill = dvui.themeGet().color(.window, .fill),
-                    .color_border = icon_color,
-                    .expand = .horizontal,
-                    .corner_radius = branch.button.wd.options.corner_radius,
-                    .background = true,
-                    .border = .{ .x = 1 },
-                    .box_shadow = .{
-                        .color = .black,
-                        .offset = .{ .x = -5, .y = 5 },
-                        .shrink = 5,
-                        .fade = 10,
-                        .alpha = 0.15,
+            { // Root is always expanded
+                const branch = tree.branch(
+                    @src(),
+                    .{
+                        .expanded = true,
                     },
-                },
-            )) {
-                try recursor(
-                    win,
-                    uniqueId,
-                    &db.body.root,
-                    tree,
-                    uniqueId,
-                    bopts,
-                    eopts,
+                    .{ .expand = .horizontal },
                 );
+                defer branch.deinit();
+
+                _ = dvui.icon(
+                    @src(),
+                    "FileIcon",
+                    dvui.entypo.folder,
+                    .{ .fill_color = icon_color },
+                    .{
+                        .gravity_y = 0.5,
+                        .padding = dvui.Rect.all(4),
+                    },
+                );
+                dvui.label(@src(), "{s}", .{"Root"}, .{
+                    .color_text = dvui.themeGet().color(.control, .text),
+                    .padding = dvui.Rect.all(4),
+                });
+                _ = dvui.icon(
+                    @src(),
+                    "DropIcon",
+                    if (branch.expanded) dvui.entypo.triangle_down else dvui.entypo.triangle_right,
+                    .{
+                        .fill_color = icon_color,
+                    },
+                    .{
+                        .gravity_y = 0.5,
+                        .gravity_x = 1.0,
+                        .padding = dvui.Rect.all(4),
+                    },
+                );
+
+                if (branch.button.clicked()) {
+                    dvui.dataSet(win, uniqueId, "group", &db.body.root);
+                }
+
+                if (branch.expander(
+                    @src(),
+                    .{ .indent = 14.0 },
+                    .{
+                        .color_fill = dvui.themeGet().color(.window, .fill),
+                        .color_border = icon_color,
+                        .expand = .horizontal,
+                        .corner_radius = branch.button.wd.options.corner_radius,
+                        .background = true,
+                        .border = .{ .x = 1 },
+                        .box_shadow = .{
+                            .color = .black,
+                            .offset = .{ .x = -5, .y = 5 },
+                            .shrink = 5,
+                            .fade = 10,
+                            .alpha = 0.15,
+                        },
+                    },
+                )) {
+                    try recursor(
+                        win,
+                        uniqueId,
+                        &db.body.root,
+                        tree,
+                        uniqueId,
+                        bopts,
+                        eopts,
+                    );
+                }
             }
         }
     }
