@@ -37,6 +37,7 @@ pub fn draw(
         // This is filled if a entry is clicked.
         // It determines which entry should be shown.
         var selected_entry_id: ?usize = null;
+        var selected_row: ?usize = null;
         var selected_entry_guuid: ?u128 = null;
         var index_map: std.AutoHashMapUnmanaged(usize, usize) = .empty;
         var row_num: usize = 0;
@@ -62,6 +63,8 @@ pub fn draw(
 
         // Buffer for search box
         var search: [128]u8 = .{0} ** 128;
+
+        var menu_active: bool = false;
     };
 
     var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
@@ -193,39 +196,59 @@ pub fn draw(
                 try local.index_map.put(allocator, local.row_num, eidx);
                 defer local.row_num += 1;
 
+                var opts: dvui.Options = .{};
+                var cellOpts: dvui.widgets.GridWidget.CellOptions = .{};
+
+                if (local.selected_row != null and local.selected_row.? == local.row_num) {
+                    opts = .{
+                        .background = true,
+                        .color_fill = dvui.themeGet().color(.control, .fill_hover),
+                    };
+                    cellOpts = .{
+                        .background = true,
+                        .color_fill = dvui.themeGet().color(.control, .fill_hover),
+                    };
+                } else if (local.menu_active) {
+                    opts = .{};
+                    cellOpts = .{};
+                } else {
+                    opts = banded.options(cell);
+                    cellOpts = banded.cellOptions(cell);
+                }
+
                 {
                     defer cell.col_num += 1;
-                    var cell_box = grid.bodyCell(@src(), cell, banded.cellOptions(cell));
+                    var cell_box = grid.bodyCell(@src(), cell, cellOpts);
                     defer cell_box.deinit();
                     dvui.labelNoFmt(
                         @src(),
                         title,
                         .{},
-                        banded.options(cell),
+                        opts,
                     );
                 }
 
                 {
                     defer cell.col_num += 1;
-                    var cell_box = grid.bodyCell(@src(), cell, banded.cellOptions(cell));
+                    var cell_box = grid.bodyCell(@src(), cell, cellOpts);
                     defer cell_box.deinit();
                     dvui.labelNoFmt(
                         @src(),
                         username,
                         .{},
-                        banded.options(cell),
+                        opts,
                     );
                 }
 
                 {
                     defer cell.col_num += 1;
-                    var cell_box = grid.bodyCell(@src(), cell, banded.cellOptions(cell));
+                    var cell_box = grid.bodyCell(@src(), cell, cellOpts);
                     defer cell_box.deinit();
                     dvui.labelNoFmt(
                         @src(),
                         url,
                         .{},
-                        banded.options(cell),
+                        opts,
                     );
                 }
             }
@@ -238,20 +261,45 @@ pub fn draw(
                 defer ctext.deinit();
 
                 if (ctext.activePoint()) |cp| {
+                    if (!local.menu_active) {
+                        if (grid.pointToCell(dvui.currentWindow().mouse_pt)) |cell| {
+                            local.selected_row = cell.row_num;
+                            local.selected_entry_id = local.index_map.get(cell.row_num);
+                            local.selected_entry_guuid = group.uuid;
+                        }
+
+                        local.menu_active = true;
+                    }
+
+                    const entry = group.entries.items[local.selected_entry_id.?];
+
                     var fw2 = dvui.floatingMenu(@src(), .{ .from = dvui.Rect.Natural.fromPoint(cp) }, .{});
                     defer fw2.deinit();
 
-                    if (dvui.menuItemLabel(@src(), "Copy Username", .{}, .{ .expand = .horizontal }) != null) {
-                        dvui.clipboardTextSet("hello");
-                        //clipboard.write("hello") catch {};
-                        ctext.close();
-                        //if (grid.pointToCell(cp.)) |cell| {
-                        //    const e = group.entries.items[cell.row_num];
-                        //    std.debug.print("{s}\n", .{e.get("UserName").?});
-                        //}
+                    if (entry.get("UserName")) |v| blk: {
+                        if (v.len == 0) break :blk;
+
+                        if (dvui.menuItemLabel(@src(), "Copy Username", .{}, .{ .expand = .horizontal }) != null) {
+                            dvui.clipboardTextSet(v);
+                            dvui.toast(@src(), .{ .message = "Username copied to clipboard" });
+                            local.cb_seconds_remaining = 20;
+                            local.cb_ts = std.time.timestamp();
+                            ctext.close();
+                        }
                     }
-                    _ = dvui.menuItemLabel(@src(), "Copy Password", .{}, .{ .expand = .horizontal });
-                }
+
+                    if (entry.get("Password")) |v| blk: {
+                        if (v.len == 0) break :blk;
+
+                        if (dvui.menuItemLabel(@src(), "Copy Password", .{}, .{ .expand = .horizontal }) != null) {
+                            dvui.clipboardTextSet(v);
+                            dvui.toast(@src(), .{ .message = "Password copied to clipboard" });
+                            local.cb_seconds_remaining = 20;
+                            local.cb_ts = std.time.timestamp();
+                            ctext.close();
+                        }
+                    }
+                } else local.menu_active = false;
             }
 
             const evts = dvui.events();
@@ -264,6 +312,7 @@ pub fn draw(
                 if (e.evt == .mouse and e.evt.mouse.action == .press) {
                     if (grid.pointToCell(dvui.currentWindow().mouse_pt)) |cell| {
                         //std.debug.print("klicked {d}\n", .{cell.row_num});
+                        local.selected_row = cell.row_num;
                         local.selected_entry_id = local.index_map.get(cell.row_num);
                         local.selected_entry_guuid = group.uuid;
                     }
@@ -316,6 +365,7 @@ fn drawAdvanced(uniqueId: dvui.Id, local: anytype) !void {
                 // Make sure the group hasn't changed and the index is not out of bounds.
                 if (local.selected_entry_guuid != group.uuid or eid >= group.entries.items.len) {
                     local.selected_entry_id = null;
+                    local.selected_row = null;
                     break :blk;
                 }
 
@@ -359,6 +409,7 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
             // Make sure the group hasn't changed and the index is not out of bounds.
             if (local.selected_entry_guuid != group.uuid or eid >= group.entries.items.len) {
                 local.selected_entry_id = null;
+                local.selected_row = null;
                 break :blk;
             }
 
