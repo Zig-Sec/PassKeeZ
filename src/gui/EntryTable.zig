@@ -65,7 +65,14 @@ pub fn draw(
         var menu_active: bool = false;
     };
 
-    var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
+    var vbox = dvui.box(
+        @src(),
+        .{ .dir = .vertical },
+        .{
+            .expand = .both,
+            .corner_radius = .all(0),
+        },
+    );
     defer vbox.deinit();
 
     // Status bar at the bottom
@@ -81,7 +88,8 @@ pub fn draw(
             .min_size_content = .{ .h = 530 },
             .expand = .both,
             .background = true,
-            .border = dvui.Rect.all(2),
+            //.border = dvui.Rect.all(2),
+            .corner_radius = .all(0),
         });
         defer grid.deinit();
 
@@ -121,20 +129,25 @@ pub fn draw(
                 try local.index_map.put(allocator, local.row_num, eidx);
                 defer local.row_num += 1;
 
-                var opts: dvui.Options = .{};
+                var opts: dvui.Options = .{
+                    .corner_radius = .all(0),
+                };
                 var cellOpts: dvui.widgets.GridWidget.CellOptions = .{};
 
                 if (local.selected_row != null and local.selected_row.? == local.row_num) {
                     opts = .{
                         .background = true,
                         .color_fill = dvui.themeGet().color(.control, .fill_hover),
+                        .corner_radius = .all(0),
                     };
                     cellOpts = .{
                         .background = true,
                         .color_fill = dvui.themeGet().color(.control, .fill_hover),
                     };
                 } else if (local.menu_active) {
-                    opts = .{};
+                    opts = .{
+                        .corner_radius = .all(0),
+                    };
                     cellOpts = .{};
                 } else {
                     opts = banded.options(cell);
@@ -262,7 +275,8 @@ fn drawAdvanced(uniqueId: dvui.Id, local: anytype) !void {
         var grid = dvui.grid(@src(), .colWidths(&local2.col_widths), .{}, .{
             .expand = .both,
             .background = true,
-            .border = dvui.Rect.all(2),
+            .corner_radius = .all(0),
+            //.border = dvui.Rect.all(2),
         });
         defer grid.deinit();
 
@@ -353,7 +367,14 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
             defer left_alignment.deinit();
 
             {
-                var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+                var inner_hbox = dvui.box(
+                    @src(),
+                    .{ .dir = .horizontal },
+                    .{
+                        .expand = .horizontal,
+                        .corner_radius = .all(0),
+                    },
+                );
                 defer inner_hbox.deinit();
 
                 dvui.label(
@@ -377,6 +398,7 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
                         .{
                             .gravity_y = 0.5,
                             .data_out = &ttout,
+                            .corner_radius = .all(0),
                         },
                     )) {
                         dvui.clipboardTextSet(v);
@@ -389,7 +411,14 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
             }
 
             {
-                var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+                var inner_hbox = dvui.box(
+                    @src(),
+                    .{ .dir = .horizontal },
+                    .{
+                        .expand = .horizontal,
+                        .corner_radius = .all(0),
+                    },
+                );
                 defer inner_hbox.deinit();
 
                 dvui.label(
@@ -413,7 +442,14 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
             }
 
             {
-                var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+                var inner_hbox = dvui.box(
+                    @src(),
+                    .{ .dir = .horizontal },
+                    .{
+                        .expand = .horizontal,
+                        .corner_radius = .all(0),
+                    },
+                );
                 defer inner_hbox.deinit();
 
                 dvui.label(
@@ -438,6 +474,7 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
                         .{
                             .gravity_y = 0.5,
                             .data_out = &ttout,
+                            .corner_radius = .all(0),
                         },
                     )) {
                         dvui.clipboardTextSet(v);
@@ -450,7 +487,14 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
             }
 
             {
-                var inner_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+                var inner_hbox = dvui.box(
+                    @src(),
+                    .{ .dir = .horizontal },
+                    .{
+                        .expand = .horizontal,
+                        .corner_radius = .all(0),
+                    },
+                );
                 defer inner_hbox.deinit();
 
                 dvui.label(
@@ -470,7 +514,14 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
                     var notes_scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both });
                     defer notes_scroll.deinit();
 
-                    var tl = dvui.textLayout(@src(), .{}, .{ .expand = .both });
+                    var tl = dvui.textLayout(
+                        @src(),
+                        .{},
+                        .{
+                            .expand = .both,
+                            .corner_radius = .all(0),
+                        },
+                    );
                     defer tl.deinit();
 
                     tl.addText(v, .{});
@@ -485,7 +536,8 @@ fn contextWindow(uniqueId: dvui.Id, local: anytype) void {
         .min_size_content = .{ .h = 360 },
         .max_size_content = .height(360),
         .expand = .horizontal,
-        .border = dvui.Rect.all(1),
+        //.border = dvui.Rect.all(1),
+        .corner_radius = .all(0),
         .gravity_y = 1.0,
     });
     defer tbox.deinit();
@@ -517,8 +569,9 @@ fn statusBar(uniqueId: dvui.Id, local: anytype) void {
     }, .{
         .min_size_content = .{ .h = 30 },
         .expand = .horizontal,
-        .border = dvui.Rect.all(1),
+        //.border = dvui.Rect.all(1),
         .gravity_y = 1.0,
+        .corner_radius = .all(0),
     });
     defer sbox.deinit();
 

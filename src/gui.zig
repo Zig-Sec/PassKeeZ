@@ -45,15 +45,14 @@ pub fn AppInit(win: *dvui.Window) !void {
     config = try Config.load(gpa);
 
     orig_content_scale = win.content_scale;
-    //try dvui.addFont("NOTO", @embedFile("../src/fonts/NotoSansKR-Regular.ttf"), null);
 
-    if (false) {
-        // If you need to set a theme based on the users preferred color scheme, do it here
-        win.theme = switch (win.backend.preferredColorScheme() orelse .light) {
-            .light => dvui.Theme.builtin.adwaita_light,
-            .dark => dvui.Theme.builtin.adwaita_dark,
-        };
-    }
+    //if (false) {
+    //    // If you need to set a theme based on the users preferred color scheme, do it here
+    //    win.theme = switch (win.backend.preferredColorScheme() orelse .light) {
+    //        .light => dvui.Theme.builtin.adwaita_light,
+    //        .dark => dvui.Theme.builtin.adwaita_dark,
+    //    };
+    //}
 
     uId = dvui.parentGet().extendId(@src(), 0);
     window = dvui.currentWindow();
@@ -174,6 +173,7 @@ pub fn sidePannel(
                 var branch_opts_override = dvui.Options{
                     .id_extra = id_extra,
                     .expand = .horizontal,
+                    .corner_radius = .all(0),
                 };
 
                 const color = icon_color;
@@ -221,6 +221,7 @@ pub fn sidePannel(
                         .margin = .{ .x = 14 },
                         .color_border = color,
                         .expand = .horizontal,
+                        .corner_radius = .all(0),
                     };
 
                     if (branch.expander(@src(), .{ .indent = 14 }, expander_opts_override.override(expander_options))) {
@@ -255,6 +256,7 @@ pub fn sidePannel(
             .{ .text = .{ .buffer = &local.searchBuffer } },
             .{
                 .expand = .horizontal,
+                .corner_radius = .all(0),
             },
         );
         te.deinit();
@@ -272,10 +274,11 @@ pub fn sidePannel(
         const bopts: dvui.Options = .{
             .margin = dvui.Rect.all(1),
             .padding = dvui.Rect.all(2),
+            .corner_radius = .all(0),
         };
         const eopts: dvui.Options = .{
             .border = .{ .x = 1 },
-            .corner_radius = dvui.Rect.all(4),
+            .corner_radius = dvui.Rect.all(0),
             .box_shadow = .{
                 .color = .black,
                 .offset = .{ .x = -5, .y = 5 },
@@ -436,6 +439,7 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
                 .{ .text = .{ .buffer = &local.path } },
                 .{
                     .expand = .horizontal,
+                    .corner_radius = .all(0),
                 },
             );
             te.deinit();
@@ -450,6 +454,7 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
                 .{
                     .gravity_y = 0.5,
                     .data_out = &ttout,
+                    .corner_radius = .all(0),
                 },
             )) {
                 const filename = dvui.dialogNativeFileOpen(
@@ -495,6 +500,7 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
                 .{
                     .expand = .horizontal,
                     .gravity_y = 0.5,
+                    .corner_radius = .all(0),
                 },
             );
             // Fucus on the password entry
@@ -520,6 +526,7 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
         } else {
             if (dvui.button(@src(), "unlock", .{}, .{
                 .expand = .horizontal,
+                .corner_radius = .all(0),
             }) or enter_pressed) blk: {
                 local.spinner_active = true;
 
