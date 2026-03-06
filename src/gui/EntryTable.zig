@@ -4,23 +4,21 @@ const dvui = @import("dvui");
 const kdbx = @import("kdbx");
 const root = @import("root");
 
+const GridType = enum {
+    general,
+    advanced,
+    const num_grids = @typeInfo(@This()).@"enum".fields.len;
+};
+
 pub fn draw(
     uniqueId: dvui.Id,
     allocator: std.mem.Allocator,
 ) !void {
-    const GridType = enum {
-        general,
-        advanced,
-        const num_grids = @typeInfo(@This()).@"enum".fields.len;
-    };
-
     const local = struct {
         // Title, Username, URL, Last Modified
         const num_cols = 3;
         const equal_spacing = [num_cols]f32{ -1, -1, -1 };
         var col_widths: [num_cols]f32 = @splat(100); // Default width to 100
-
-        var highlighted_row: ?usize = null;
 
         const resize_min = 80;
         const resize_max = 500;
@@ -36,9 +34,9 @@ pub fn draw(
 
         // This is filled if a entry is clicked.
         // It determines which entry should be shown.
-        var selected_entry_id: ?usize = null;
-        var selected_row: ?usize = null;
-        var selected_entry_guuid: ?u128 = null;
+        var selected_entry_id: ?usize = null; // The entry index within the kdbx group
+        var selected_row: ?usize = null; // The slected row displayed
+        var selected_entry_guuid: ?u128 = null; // The group uuid
         var index_map: std.AutoHashMapUnmanaged(usize, usize) = .empty;
         var row_num: usize = 0;
 
@@ -71,84 +69,11 @@ pub fn draw(
     defer vbox.deinit();
 
     // Status bar at the bottom
-    {
-        var sbox = dvui.box(@src(), .{
-            .dir = .horizontal,
-        }, .{
-            .min_size_content = .{ .h = 30 },
-            .expand = .horizontal,
-            .border = dvui.Rect.all(1),
-            .gravity_y = 1.0,
-        });
-        defer sbox.deinit();
-
-        var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
-        defer scroll.deinit();
-
-        if (dvui.dataGet(null, uniqueId, "group", *kdbx.Group)) |group| {
-            dvui.label(@src(), "Selected Group: {s}, #Entries: {d}", .{ group.name, local.row_num }, .{
-                .gravity_y = 0.5,
-            });
-        }
-
-        if (local.cb_seconds_remaining) |*rem| blk: {
-            const curr = std.time.timestamp();
-            if (curr >= local.cb_ts.? + rem.*) {
-                local.cb_seconds_remaining = null;
-                local.cb_ts = null;
-                dvui.clipboardTextSet("\x00"); // empty clip board
-                break :blk;
-            }
-
-            const millis = @divFloor(dvui.frameTimeNS(), 1_000_000);
-            const left = @as(i32, @intCast(@rem(millis, 1000)));
-
-            {
-                var mslabel = dvui.LabelWidget.init(@src(), "Clipboard: {d}s", .{local.cb_ts.? + rem.* - curr}, .{}, .{
-                    .gravity_x = 1.0,
-                    .gravity_y = 0.5,
-                });
-                defer mslabel.deinit();
-
-                mslabel.draw();
-
-                if (dvui.timerDoneOrNone(mslabel.data().id)) {
-                    const wait = 1000 * (1000 - left);
-                    dvui.timer(mslabel.data().id, wait);
-                }
-            }
-        }
-    }
+    statusBar(uniqueId, local);
 
     // This is the context window for an entry which is placed on the bottom
     // (below the table).
-    {
-        var tbox = dvui.box(@src(), .{}, .{
-            .min_size_content = .{ .h = 360 },
-            .max_size_content = .height(360),
-            .expand = .horizontal,
-            .border = dvui.Rect.all(1),
-            .gravity_y = 1.0,
-        });
-        defer tbox.deinit();
-
-        {
-            var tabs = dvui.tabs(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
-            defer tabs.deinit();
-            for (0..GridType.num_grids) |tab_num| {
-                const this_tab: GridType = @enumFromInt(tab_num);
-
-                if (tabs.addTabLabel(local.tabSelected(this_tab), local.tabName(this_tab))) {
-                    local.active_grid = this_tab;
-                }
-            }
-        }
-
-        switch (local.active_grid) {
-            .general => try drawGeneral(uniqueId, &local),
-            .advanced => try drawAdvanced(uniqueId, &local),
-        }
-    }
+    contextWindow(uniqueId, local);
 
     // The list of entries of a group.
     {
@@ -554,6 +479,88 @@ fn drawGeneral(uniqueId: dvui.Id, local: anytype) !void {
         }
     }
 }
+
+fn contextWindow(uniqueId: dvui.Id, local: anytype) void {
+    var tbox = dvui.box(@src(), .{}, .{
+        .min_size_content = .{ .h = 360 },
+        .max_size_content = .height(360),
+        .expand = .horizontal,
+        .border = dvui.Rect.all(1),
+        .gravity_y = 1.0,
+    });
+    defer tbox.deinit();
+
+    {
+        var tabs = dvui.tabs(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer tabs.deinit();
+        for (0..GridType.num_grids) |tab_num| {
+            const this_tab: GridType = @enumFromInt(tab_num);
+
+            if (tabs.addTabLabel(local.tabSelected(this_tab), local.tabName(this_tab))) {
+                local.active_grid = this_tab;
+            }
+        }
+    }
+
+    switch (local.active_grid) {
+        .general => try drawGeneral(uniqueId, &local),
+        .advanced => try drawAdvanced(uniqueId, &local),
+    }
+}
+
+// Status bar displaying additional information like the
+// number of entries displayed or the time remaining until
+// the clipboard is cleared.
+fn statusBar(uniqueId: dvui.Id, local: anytype) void {
+    var sbox = dvui.box(@src(), .{
+        .dir = .horizontal,
+    }, .{
+        .min_size_content = .{ .h = 30 },
+        .expand = .horizontal,
+        .border = dvui.Rect.all(1),
+        .gravity_y = 1.0,
+    });
+    defer sbox.deinit();
+
+    var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
+    defer scroll.deinit();
+
+    if (dvui.dataGet(null, uniqueId, "group", *kdbx.Group)) |group| {
+        dvui.label(@src(), "Selected Group: {s}, #Entries: {d}", .{ group.name, local.row_num }, .{
+            .gravity_y = 0.5,
+        });
+    }
+
+    if (local.cb_seconds_remaining) |*rem| blk: {
+        const curr = std.time.timestamp();
+        if (curr >= local.cb_ts.? + rem.*) {
+            local.cb_seconds_remaining = null;
+            local.cb_ts = null;
+            dvui.clipboardTextSet("\x00"); // empty clip board
+            break :blk;
+        }
+
+        const millis = @divFloor(dvui.frameTimeNS(), 1_000_000);
+        const left = @as(i32, @intCast(@rem(millis, 1000)));
+
+        {
+            var mslabel = dvui.LabelWidget.init(@src(), "Clipboard: {d}s", .{local.cb_ts.? + rem.* - curr}, .{}, .{
+                .gravity_x = 1.0,
+                .gravity_y = 0.5,
+            });
+            defer mslabel.deinit();
+
+            mslabel.draw();
+
+            if (dvui.timerDoneOrNone(mslabel.data().id)) {
+                const wait = 1000 * (1000 - left);
+                dvui.timer(mslabel.data().id, wait);
+            }
+        }
+    }
+}
+
+// Logic
 
 fn getEntryIndexFromRowNum(
     group: *const kdbx.Group,
