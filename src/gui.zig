@@ -394,7 +394,7 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
         var first: bool = true;
 
         pub fn setData() void {
-            @memcpy(&path, config.db_path);
+            @memcpy(path[0..config.db_path.len], config.db_path);
         }
     };
 
