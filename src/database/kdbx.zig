@@ -404,5 +404,7 @@ fn credentialFromEntry(entry: *const kdbx.Entry) !keylib.ctap.authenticator.Cred
         .created = 0,
         .discoverable = true,
         .policy = .userVerificationOptional,
+        .be = entry.getKpexBe(),
+        .bs = entry.getKpexBs(),
     };
 }
