@@ -1,7 +1,6 @@
 Site {
     .title = "PassKeeZ",
     .host_url = "https://passkeez.org",
-    .url_path_prefix = "PassKeeZ",
     .content_dir_path = "content",
     .layouts_dir_path = "layouts",
     .assets_dir_path = "assets",
@@ -9,4 +8,5 @@ Site {
         "Temml.woff2",
         "Passkeez.png",
     ],
+    .url_path_prefix = "PassKeeZ",
 }
