@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+	<head id="head">
+		<meta charset="utf-8">
+		<meta name="viewport" content="initial-scale=1">
+		<title>PassKeeZ</title>
+		<link type="text/css" rel="stylesheet" href="/PassKeeZ/style.css">
+		<link type="text/css" rel="stylesheet" href="/PassKeeZ/highlight.css">
+		<!-- mathtex -->
+		<link type="text/css" rel="stylesheet" href="/PassKeeZ/Temml-Local.css">
+		<script defer src="/PassKeeZ/temml.min.js"></script>
+		<script defer src="/PassKeeZ/render-mathtex.js"></script>
+		<!-- /mathtex -->
+		
+	<style>
+		.date {
+			font-size: 0.9em;
+		}
+		
+		.title h3{
+			margin-top: 0;
+		}
+	</style>
+
+	</head>
+	<body id="body">
+		<h1 class="site-title">PassKeeZ</h1>
+		<nav>
+			<a href="/PassKeeZ/">Home</a>
+			&nbsp; • &nbsp;
+			<a href="/PassKeeZ/about/">About</a>
+			&nbsp; • &nbsp;
+			<a href="/PassKeeZ/blog/">Blog</a>
+			
+				&nbsp; • &nbsp;
+				<a href="/PassKeeZ/devlog/1990/">Devlog</a>
+			
+		</nav>
+		
+	<h1>Blog</h1>
+	<div><p>This page defines the blog section and lists all posts in it.</p><p>A “site section” in Zine is a group of pages that form a logical subtree of the website. It’s related to directory structure, but it’s not an entirely 1:1 mapping.</p><p>What defines a site section in Zine is the presence of <code>index.smd</code> files. You can learn more <a href="https://zine-ssg.io/docs/" target="_blank">in the official Zine docs</a>.</p><p>Take also a look at <code>layouts/blog.shtml</code> to get an idea of how to render a page list in a SuperHTML template.</p><p>The blog section also has an <a href="/PassKeeZ/blog/index.xml">RSS feed</a>.</p><p>In Zine, RSS feeds are considered “alternative” versions of an existing page. In concrete defines the blog section and that lists all pages in it, is rendered in two versions: HTML for human readers, and XML for RSS readers.</p><p>This is the SuperMD frontmatter code that defines the RSS feed:</p><pre><code class="ziggy">.<span class="field">alternatives</span> <span class="punctuation">=</span> <span class="punctuation_bracket">[</span><span class="error punctuation_bracket">{</span><span class="error"> 
+    </span><span class="error constant">.name</span><span class="error"> </span><span class="error punctuation">=</span> <span class="string">&quot;rss&quot;</span><span class="punctuation_delimiter">,</span>
+    <span class="error constant">.layout</span><span class="error"> </span><span class="error punctuation">=</span> <span class="string">&quot;rss.xml&quot;</span><span class="punctuation_delimiter">,</span> 
+    <span class="error constant">.output</span><span class="error"> </span><span class="error punctuation">=</span> <span class="string">&quot;index.xml&quot;</span><span class="punctuation_delimiter">,</span>
+<span class="error punctuation_bracket">}</span><span class="punctuation_bracket">]</span><span class="punctuation_delimiter">,</span>
+</code></pre>
+<p><span class="small ">(btw syntax highlighting is done statically in Zine, no need for javascript libraries, unless you want to)</span></p></div>
+	<div>
+		<h2>Post list</h2>
+		<div>
+			<span class="date">January 02, 1990</span>
+			<a class="title" href="/PassKeeZ/blog/second-post/">
+				<h3>Second Post</h3>
+			</a>
+		
+			<span class="date">January 01, 1990</span>
+			<a class="title" href="/PassKeeZ/blog/first-post/">
+				<h3>First Post: What&apos;s A Zine?</h3>
+			</a>
+		</div>
+	</div>
+
+		<footer>
+			<hr>
+			<h5>SITE UNDER CONSTRUCTION</h5>
+			<img src="/PassKeeZ/under-construction.gif" width="90">
+		</footer>
+	</body>
+</html>

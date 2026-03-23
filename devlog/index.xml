@@ -1,0 +1,40 @@
+<rss version="2.0">
+  <channel>
+    <title>PassKeeZ</title>
+    <link>https://passkeez.org</link>
+    <description>PassKeeZ - Devlog</description>
+    <generator>Zine -- https://zine-ssg.io</generator>
+    <language>en-US</language>
+    <lastBuildDate>Mon, 23 Mar 2026 21:44:06 +0000</lastBuildDate>
+    
+      
+        <item>
+          <title>Third Entry
+</title>
+          <description>&lt;div id=&quot;1990-01-03T00:00:00&quot;&gt;&lt;h2&gt;&lt;a class=&quot;&quot; href=&quot;#1990-01-03T00:00:00&quot;&gt;Third Entry&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;This is the third entry.&lt;/p&gt;&lt;/div&gt;</description>
+          <link>https://passkeez.org/PassKeeZ/devlog/#1990-01-03T00:00:00</link>
+          <pubDate>Wed, 03 Jan 1990 00:00:00 +0000</pubDate>
+          <guid>https://passkeez.org/PassKeeZ/devlog/#1990-01-03T00:00:00</guid>
+        </item>
+      
+        <item>
+          <title>Second Entry
+</title>
+          <description>&lt;div id=&quot;1990-01-02T00:00:00&quot;&gt;&lt;h2&gt;&lt;a class=&quot;&quot; href=&quot;#1990-01-02T00:00:00&quot;&gt;Second Entry&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;This is the second entry.&lt;/p&gt;&lt;/div&gt;</description>
+          <link>https://passkeez.org/PassKeeZ/devlog/#1990-01-02T00:00:00</link>
+          <pubDate>Tue, 02 Jan 1990 00:00:00 +0000</pubDate>
+          <guid>https://passkeez.org/PassKeeZ/devlog/#1990-01-02T00:00:00</guid>
+        </item>
+      
+        <item>
+          <title>Hello Zine
+</title>
+          <description>&lt;div id=&quot;1990-01-01T00:00:00&quot;&gt;&lt;h2&gt;&lt;a class=&quot;&quot; href=&quot;#1990-01-01T00:00:00&quot;&gt;Hello Zine&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;This is the first entry in this year’s devlog created with &lt;a href=&quot;https://zine-ssg.io&quot; target=&quot;_blank&quot;&gt;Zine&lt;/a&gt;!&lt;/p&gt;&lt;/div&gt;</description>
+          <link>https://passkeez.org/PassKeeZ/devlog/#1990-01-01T00:00:00</link>
+          <pubDate>Mon, 01 Jan 1990 00:00:00 +0000</pubDate>
+          <guid>https://passkeez.org/PassKeeZ/devlog/#1990-01-01T00:00:00</guid>
+        </item>
+      
+    
+  </channel>
+</rss>

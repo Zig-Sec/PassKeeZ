@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+	<head id="head">
+		<meta charset="utf-8">
+		<meta name="viewport" content="initial-scale=1">
+		<title>PassKeeZ</title>
+		<link type="text/css" rel="stylesheet" href="/PassKeeZ/style.css">
+		<link type="text/css" rel="stylesheet" href="/PassKeeZ/highlight.css">
+		<!-- mathtex -->
+		<link type="text/css" rel="stylesheet" href="/PassKeeZ/Temml-Local.css">
+		<script defer src="/PassKeeZ/temml.min.js"></script>
+		<script defer src="/PassKeeZ/render-mathtex.js"></script>
+		<!-- /mathtex -->
+		
+	<style>
+		#prev-next {
+			display: flex;
+			flex-direction: row;
+			justify-content: space-between;
+			margin-top: 40px;
+		}
+		
+		figure {
+			align-self: center;
+			text-align: center;
+			font-style: italic;
+		}
+		
+		.post {
+			display:flex;
+			flex-direction: column;
+		}
+	</style>
+
+	</head>
+	<body id="body">
+		<h1 class="site-title">PassKeeZ</h1>
+		<nav>
+			<a href="/PassKeeZ/">Home</a>
+			&nbsp; • &nbsp;
+			<a href="/PassKeeZ/about/">About</a>
+			&nbsp; • &nbsp;
+			<a href="/PassKeeZ/blog/">Blog</a>
+			
+				&nbsp; • &nbsp;
+				<a href="/PassKeeZ/devlog/1990/">Devlog</a>
+			
+		</nav>
+		
+	<h1>Second Post</h1>
+	<div class="post"><p>This second post is mainly here to show you that you can also create single file posts for convenience. The first post contains more interesting content.</p><p>Don’t forget to read <a href="https://zine-ssg.io/docs/supermd/" target="_blank">the official SuperMD docs</a> to know how to <em>style</em> your content.</p><p>Btw this sample website also includes the JS/CSS dependencies required to render math:</p><script type="math/tex">\begin{aligned}
+f(t) &= \int_{-\infty}^\infty F(\omega) \cdot (-1)^{2 \omega t} \mathrm{d}\omega \\
+F(\omega) &= \int_{-\infty}^\infty f(t) \div (-1)^{2 \omega t} \mathrm{d}t \\
+\end{aligned}
+</script><p>This: <script type="math/tex">(-1)^x = \cos(\pi x) + i\sin(\pi x)</script> is an inline equation instead!</p></div>
+	<div id="prev-next">
+		<div>
+			<a href="/PassKeeZ/blog/first-post/">
+				←
+				<span>First Post: What&apos;s A Zine?</span>
+			</a>
+		</div>
+		<div></div>
+	</div>
+
+		<footer>
+			<hr>
+			<h5>SITE UNDER CONSTRUCTION</h5>
+			<img src="/PassKeeZ/under-construction.gif" width="90">
+		</footer>
+	</body>
+</html>
