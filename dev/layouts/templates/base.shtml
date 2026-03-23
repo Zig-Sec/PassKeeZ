@@ -14,7 +14,9 @@
 		<super>
 	</head>
 	<body id="body">
-		<h1 class="site-title" :text="$site.title"></h1>
+		<img width=50% src="$site.asset('Passkeez.png').link()">
+		<!--<h1 class="site-title" :text="$site.title"></h1>-->
+        <h4>FIDO2 / Passkey compatible Authenticator for Linux</h4>
 		<nav>
 			<a href="$site.page('').link()">Home</a>
 			&nbsp; • &nbsp;
