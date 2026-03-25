@@ -331,7 +331,11 @@ fn drawAdvanced(uniqueId: dvui.Id, local: anytype) !void {
                         defer cell_box.deinit();
                         var text = dvui.textLayout(@src(), .{ .break_lines = true }, .{ .background = false });
                         defer text.deinit();
-                        text.addText(kv.value, banded.options(cell));
+                        if (kv.protected) {
+                            text.addText("*****", banded.options(cell));
+                        } else {
+                            text.addText(kv.value, banded.options(cell));
+                        }
                     }
                 }
             }
