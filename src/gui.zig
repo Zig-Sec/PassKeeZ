@@ -37,18 +37,13 @@ var window: *dvui.Window = undefined;
 pub const MenuKind = enum {
     none,
     change_password,
+    set_password,
 
     pub fn name(self: @This()) []const u8 {
         return switch (self) {
             .none => "None",
             .change_password => "Change Password",
-        };
-    }
-
-    pub fn scaleOffset(self: @This()) struct { scale: f32, offset: dvui.Point } {
-        return switch (self) {
-            .none => .{ .scale = 0.45, .offset = .{} },
-            .change_password => .{ .scale = 0.45, .offset = .{} },
+            .set_password => "Set Password",
         };
     }
 };
@@ -56,6 +51,28 @@ pub const MenuKind = enum {
 var menu_active = MenuKind.none;
 var deviceInfo: ?client.Info = null;
 var device: ?*client.Transports.Transport = null;
+
+const transport = struct {
+    var transport_labels: ?std.ArrayList([]const u8) = null;
+    var transports: ?client.Transports = null;
+    var loading_transports: bool = false;
+    var choice: ?usize = null;
+
+    pub fn reset(a: std.mem.Allocator) void {
+        if (transport_labels) |*t| {
+            for (t.items) |i| a.free(i);
+            t.deinit(a);
+        }
+        transport_labels = null;
+
+        if (transports) |t| {
+            t.deinit();
+        }
+        transports = null;
+
+        choice = null;
+    }
+};
 
 // Runs before the first frame, after backend and dvui.Window.init()
 // - runs between win.begin()/win.end()
@@ -173,9 +190,359 @@ pub fn loginWidget(
         if (paned.collapsed() and dvui.button(@src(), "Back", .{}, .{ .min_size_content = .{ .h = 30 } })) {
             paned.animateSplit(1.0);
         }
+
+        switch (menu_active) {
+            .change_password => try drawChangePassword(win, uniqueId, allocator, paned),
+            .set_password => try drawSetPassword(win, uniqueId, allocator, paned),
+            .none => {},
+        }
     }
 
     paned.deinit();
+}
+
+fn drawSetPassword(
+    win: *dvui.Window,
+    uniqueId: dvui.Id,
+    allocator: std.mem.Allocator,
+    paned: *dvui.PanedWidget,
+) !void {
+    _ = allocator;
+    _ = paned;
+
+    const local = struct {
+        var new_password: [64]u8 = .{0} ** 64;
+        var verify_new_password: [64]u8 = .{0} ** 64;
+        var spinner_active: bool = false;
+    };
+
+    var enter_pressed = false;
+
+    var left_alignment = dvui.Alignment.init(@src(), 0);
+    defer left_alignment.deinit();
+
+    var inner_vbox = dvui.box(
+        @src(),
+        .{ .dir = .vertical },
+        .{
+            .gravity_x = 0.5,
+            .gravity_y = 0.5,
+            .min_size_content = .width(360.0),
+        },
+    );
+    defer inner_vbox.deinit();
+
+    {
+        var hbox = dvui.box(
+            @src(),
+            .{ .dir = .horizontal },
+            .{ .expand = .horizontal },
+        );
+        defer hbox.deinit();
+
+        dvui.label(@src(), "New PIN", .{}, .{
+            .gravity_y = 0.5,
+        });
+
+        left_alignment.spacer(@src(), 0);
+
+        var te = dvui.textEntry(
+            @src(),
+            .{
+                .text = .{ .buffer = &local.new_password },
+                .password_char = "*",
+            },
+            .{
+                .expand = .horizontal,
+                .gravity_y = 0.5,
+                .corner_radius = .all(0),
+            },
+        );
+
+        // Check if the user pressed enter. We treat this the same as clicking the
+        // button below.
+        enter_pressed = te.enter_pressed;
+
+        te.deinit();
+    }
+
+    {
+        var hbox = dvui.box(
+            @src(),
+            .{ .dir = .horizontal },
+            .{ .expand = .horizontal },
+        );
+        defer hbox.deinit();
+
+        dvui.label(@src(), "Repeat New PIN", .{}, .{
+            .gravity_y = 0.5,
+        });
+
+        left_alignment.spacer(@src(), 0);
+
+        var te = dvui.textEntry(
+            @src(),
+            .{
+                .text = .{ .buffer = &local.verify_new_password },
+                .password_char = "*",
+            },
+            .{
+                .expand = .horizontal,
+                .gravity_y = 0.5,
+                .corner_radius = .all(0),
+            },
+        );
+
+        // Check if the user pressed enter. We treat this the same as clicking the
+        // button below.
+        enter_pressed = te.enter_pressed;
+
+        te.deinit();
+    }
+
+    if (local.spinner_active) {
+        dvui.spinner(
+            @src(),
+            .{
+                .color_text = .{ .r = 100, .g = 200, .b = 100 },
+                .gravity_x = 0.5,
+            },
+        );
+    } else {
+        if (dvui.button(@src(), "Set PIN", .{}, .{
+            .expand = .horizontal,
+            .corner_radius = .all(0),
+        }) or enter_pressed) blk: {
+            const new = getSlice(&local.new_password);
+            const new2 = getSlice(&local.verify_new_password);
+
+            if (deviceInfo.?.minPINLength) |len| {
+                if (new.len < len) {
+                    dvui.toast(@src(), .{ .window = win, .message = "New PIN too short" });
+                    break :blk;
+                }
+            }
+
+            if (!std.mem.eql(u8, new, new2)) {
+                dvui.toast(@src(), .{ .window = win, .message = "PINs don't match" });
+                break :blk;
+            }
+
+            local.spinner_active = true;
+
+            const bg_thread = std.Thread.spawn(
+                .{},
+                set_pin,
+                .{
+                    win,
+                    uniqueId,
+                    gpa,
+                    null,
+                    new,
+                    &local.spinner_active,
+                },
+            ) catch |err| {
+                dvui.log.info(
+                    "failed to spawn background thread to unlock database ({any})",
+                    .{err},
+                );
+                break :blk;
+            };
+            bg_thread.detach();
+        }
+    }
+}
+
+fn drawChangePassword(
+    win: *dvui.Window,
+    uniqueId: dvui.Id,
+    allocator: std.mem.Allocator,
+    paned: *dvui.PanedWidget,
+) !void {
+    _ = allocator;
+    _ = paned;
+
+    const local = struct {
+        var old_password: [64]u8 = .{0} ** 64;
+        var new_password: [64]u8 = .{0} ** 64;
+        var verify_new_password: [64]u8 = .{0} ** 64;
+        var spinner_active: bool = false;
+    };
+
+    var enter_pressed = false;
+
+    var left_alignment = dvui.Alignment.init(@src(), 0);
+    defer left_alignment.deinit();
+
+    var inner_vbox = dvui.box(
+        @src(),
+        .{ .dir = .vertical },
+        .{
+            .gravity_x = 0.5,
+            .gravity_y = 0.5,
+            .min_size_content = .width(360.0),
+        },
+    );
+    defer inner_vbox.deinit();
+
+    {
+        var hbox = dvui.box(
+            @src(),
+            .{ .dir = .horizontal },
+            .{ .expand = .horizontal },
+        );
+        defer hbox.deinit();
+
+        dvui.label(@src(), "Current PIN", .{}, .{
+            .gravity_y = 0.5,
+        });
+
+        left_alignment.spacer(@src(), 0);
+
+        var te = dvui.textEntry(
+            @src(),
+            .{
+                .text = .{ .buffer = &local.old_password },
+                .password_char = "*",
+            },
+            .{
+                .expand = .horizontal,
+                .gravity_y = 0.5,
+                .corner_radius = .all(0),
+            },
+        );
+        // Fucus on the password entry
+        if (dvui.firstFrame(te.data().id)) {
+            dvui.focusWidget(te.data().id, null, null);
+        }
+
+        // Check if the user pressed enter. We treat this the same as clicking the
+        // button below.
+        enter_pressed = te.enter_pressed;
+
+        te.deinit();
+    }
+
+    {
+        var hbox = dvui.box(
+            @src(),
+            .{ .dir = .horizontal },
+            .{ .expand = .horizontal },
+        );
+        defer hbox.deinit();
+
+        dvui.label(@src(), "New PIN", .{}, .{
+            .gravity_y = 0.5,
+        });
+
+        left_alignment.spacer(@src(), 0);
+
+        var te = dvui.textEntry(
+            @src(),
+            .{
+                .text = .{ .buffer = &local.new_password },
+                .password_char = "*",
+            },
+            .{
+                .expand = .horizontal,
+                .gravity_y = 0.5,
+                .corner_radius = .all(0),
+            },
+        );
+
+        // Check if the user pressed enter. We treat this the same as clicking the
+        // button below.
+        enter_pressed = te.enter_pressed;
+
+        te.deinit();
+    }
+
+    {
+        var hbox = dvui.box(
+            @src(),
+            .{ .dir = .horizontal },
+            .{ .expand = .horizontal },
+        );
+        defer hbox.deinit();
+
+        dvui.label(@src(), "Repeat New PIN", .{}, .{
+            .gravity_y = 0.5,
+        });
+
+        left_alignment.spacer(@src(), 0);
+
+        var te = dvui.textEntry(
+            @src(),
+            .{
+                .text = .{ .buffer = &local.verify_new_password },
+                .password_char = "*",
+            },
+            .{
+                .expand = .horizontal,
+                .gravity_y = 0.5,
+                .corner_radius = .all(0),
+            },
+        );
+
+        // Check if the user pressed enter. We treat this the same as clicking the
+        // button below.
+        enter_pressed = te.enter_pressed;
+
+        te.deinit();
+    }
+
+    if (local.spinner_active) {
+        dvui.spinner(
+            @src(),
+            .{
+                .color_text = .{ .r = 100, .g = 200, .b = 100 },
+                .gravity_x = 0.5,
+            },
+        );
+    } else {
+        if (dvui.button(@src(), "Change PIN", .{}, .{
+            .expand = .horizontal,
+            .corner_radius = .all(0),
+        }) or enter_pressed) blk: {
+            const old = getSlice(&local.old_password);
+            const new = getSlice(&local.new_password);
+            const new2 = getSlice(&local.verify_new_password);
+
+            if (deviceInfo.?.minPINLength) |len| {
+                if (new.len < len) {
+                    dvui.toast(@src(), .{ .window = win, .message = "New PIN too short" });
+                    break :blk;
+                }
+            }
+
+            if (!std.mem.eql(u8, new, new2)) {
+                dvui.toast(@src(), .{ .window = win, .message = "PINs don't match" });
+                break :blk;
+            }
+
+            local.spinner_active = true;
+
+            const bg_thread = std.Thread.spawn(
+                .{},
+                set_pin,
+                .{
+                    win,
+                    uniqueId,
+                    gpa,
+                    old,
+                    new,
+                    &local.spinner_active,
+                },
+            ) catch |err| {
+                dvui.log.info(
+                    "failed to spawn background thread to unlock database ({any})",
+                    .{err},
+                );
+                break :blk;
+            };
+            bg_thread.detach();
+        }
+    }
 }
 
 fn drawDeviceInfo(
@@ -261,7 +628,12 @@ fn drawDeviceInfo(
                         .expand = .horizontal,
                     },
                 )) {
-                    menu_active = .change_password;
+                    if (cp) {
+                        menu_active = .change_password;
+                    } else {
+                        menu_active = .set_password;
+                    }
+
                     if (paned.collapsed()) {
                         paned.animateSplit(0.0);
                     }
@@ -276,25 +648,19 @@ fn drawDeviceSelectorWidget(
     uniqueId: dvui.Id,
     allocator: std.mem.Allocator,
 ) !void {
-    const local = struct {
-        var transport_labels: ?std.ArrayList([]const u8) = null;
-        var transports: ?client.Transports = null;
-        var loading_transports: bool = false;
-        var choice: ?usize = null;
-    };
 
     // Load list of available devices
-    if (local.transports == null and !local.loading_transports) blk: {
-        local.loading_transports = true;
+    if (transport.transports == null and !transport.loading_transports) blk: {
+        transport.loading_transports = true;
 
         const bg_thread = std.Thread.spawn(
             .{},
             list_available_devices,
             .{
-                &local.transports,
-                &local.transport_labels,
-                &local.loading_transports,
-                &local.choice,
+                &transport.transports,
+                &transport.transport_labels,
+                &transport.loading_transports,
+                &transport.choice,
                 allocator,
             },
         ) catch |err| {
@@ -328,11 +694,11 @@ fn drawDeviceSelectorWidget(
 
         left_alignment.spacer(@src(), 0);
 
-        if (local.transport_labels) |labels| {
+        if (transport.transport_labels) |labels| {
             if (dvui.dropdown(
                 @src(),
                 labels.items,
-                .{ .choice_nullable = &local.choice },
+                .{ .choice_nullable = &transport.choice },
                 .{},
                 .{
                     .gravity_y = 0.5,
@@ -340,8 +706,8 @@ fn drawDeviceSelectorWidget(
                     .expand = .horizontal,
                 },
             )) blk: {
-                if (local.choice) |i| {
-                    std.log.info("selected device [{d}] '{s}'", .{ i, local.transport_labels.?.items[i] });
+                if (transport.choice) |i| {
+                    std.log.info("selected device [{d}] '{s}'", .{ i, transport.transport_labels.?.items[i] });
 
                     closeDevice(win, uniqueId, allocator);
 
@@ -351,7 +717,7 @@ fn drawDeviceSelectorWidget(
                         .{
                             win,
                             uniqueId,
-                            local,
+                            transport,
                             allocator,
                         },
                     ) catch |err| {
@@ -371,7 +737,7 @@ fn drawDeviceSelectorWidget(
             _ = dvui.dropdown(
                 @src(),
                 &.{},
-                .{ .choice_nullable = &local.choice },
+                .{ .choice_nullable = &transport.choice },
                 .{},
                 .{
                     .gravity_y = 0.5,
@@ -394,19 +760,19 @@ fn drawDeviceSelectorWidget(
                 .corner_radius = .all(0),
             },
         )) {
-            if (!local.loading_transports) blk: {
+            if (!transport.loading_transports) blk: {
                 closeDevice(win, uniqueId, allocator);
 
-                local.loading_transports = true;
+                transport.loading_transports = true;
 
                 const bg_thread = std.Thread.spawn(
                     .{},
                     list_available_devices,
                     .{
-                        &local.transports,
-                        &local.transport_labels,
-                        &local.loading_transports,
-                        &local.choice,
+                        &transport.transports,
+                        &transport.transport_labels,
+                        &transport.loading_transports,
+                        &transport.choice,
                         allocator,
                     },
                 ) catch |err| {
@@ -426,6 +792,62 @@ fn drawDeviceSelectorWidget(
             .{},
             .{},
         );
+    }
+
+    if (device != null and deviceInfo == null) {
+        if (dvui.button(
+            @src(),
+            "Open Authenticator",
+            .{},
+            .{
+                .expand = .horizontal,
+            },
+        )) blk: {
+            const bg_thread = std.Thread.spawn(
+                .{},
+                get_device_info,
+                .{
+                    win,
+                    uniqueId,
+                    transport,
+                    gpa,
+                },
+            ) catch |err| {
+                dvui.log.info(
+                    "failed to spawn background thread to open authenticator ({any})",
+                    .{err},
+                );
+                break :blk;
+            };
+            bg_thread.detach();
+        }
+
+        if (dvui.button(
+            @src(),
+            "Reset Authenticator",
+            .{},
+            .{
+                .gravity_y = 1.0,
+                .expand = .horizontal,
+            },
+        )) blk: {
+            const bg_thread = std.Thread.spawn(
+                .{},
+                reset,
+                .{
+                    win,
+                    uniqueId,
+                    gpa,
+                },
+            ) catch |err| {
+                dvui.log.info(
+                    "failed to spawn background thread to reset authenticator ({any})",
+                    .{err},
+                );
+                break :blk;
+            };
+            bg_thread.detach();
+        }
     }
 }
 
@@ -450,26 +872,157 @@ pub fn closeDevice(
     deviceInfo = null;
 }
 
-fn open_device(
+fn reset(
+    win: *dvui.Window,
+    uniqueId: dvui.Id,
+    a: std.mem.Allocator,
+) void {
+    if (device == null) {
+        std.log.err("reset called despite 'device' being 'null'", .{});
+        return;
+    }
+
+    var promise = client.reset(device.?, 10000) catch |e| {
+        std.log.err("failed to send reset command {any}", .{e});
+        dvui.toast(@src(), .{ .window = win, .message = "Device reset failed" });
+        return;
+    };
+
+    while (true) {
+        const state = promise.get(a);
+        defer state.deinit(a);
+
+        switch (state) {
+            .pending => |p| {
+                switch (p) {
+                    .processing => std.log.info("processing", .{}),
+                    .user_presence => std.log.info("user presence", .{}),
+                    .waiting => std.log.info("waiting", .{}),
+                }
+            },
+            .fulfilled => {
+                closeDevice(win, uniqueId, a);
+                transport.reset(a);
+
+                dvui.toast(@src(), .{ .window = win, .message = "Device successfully reset" });
+                break;
+            },
+            .rejected => |e| {
+                std.log.err("{any}", .{e});
+                dvui.toast(@src(), .{ .window = win, .message = "Device reset rejected" });
+                break;
+            },
+        }
+    }
+}
+
+fn set_pin(
+    win: *dvui.Window,
+    uniqueId: dvui.Id,
+    a: std.mem.Allocator,
+    curPin: ?[]const u8,
+    newPin: []const u8,
+    spinner_active: *bool,
+) void {
+    _ = uniqueId;
+
+    defer spinner_active.* = false;
+
+    std.log.info("changing existing PIN", .{});
+
+    if (device == null) {
+        std.log.err("set_pin called despite 'device' being 'null'", .{});
+        return;
+    }
+
+    if (deviceInfo.?.options.clientPin == null) {
+        std.log.warn("client PIN not supported by authenticator", .{});
+        return;
+    }
+
+    // Obtain a shared secret from the authenticator.
+    if (deviceInfo.?.pinUvAuthProtocols == null) {
+        std.log.err("pinUvAuthProtocols list not provided or empty", .{});
+        return;
+    }
+
+    const pinUvAuthProtocol = deviceInfo.?.pinUvAuthProtocols.?[0];
+
+    var shared_secret = client.getKeyAgreement(
+        device.?,
+        pinUvAuthProtocol,
+        a,
+    ) catch |e| {
+        std.log.err("failed to get key agreement key ({any})", .{e});
+        return;
+    };
+
+    // Change an existing PIN
+    if (deviceInfo.?.options.clientPin.?) {
+        if (curPin == null) {
+            std.log.err("curPin argument required", .{});
+            return;
+        }
+
+        var cpr = client.changePin(
+            device.?,
+            &shared_secret,
+            curPin.?,
+            newPin,
+            a,
+        ) catch |e| {
+            std.log.err("failed to change pin: {any}", .{e});
+            return;
+        };
+
+        var cp_state = cpr.await(a) catch |e| {
+            std.log.err("awaiting response failed ({any})", .{e});
+            return;
+        };
+        defer cp_state.deinit(a);
+
+        switch (cp_state) {
+            .fulfilled => |data| {
+                const status_code = data[0];
+
+                if (status_code != 0) {
+                    std.log.err("failed to change pin ({d})", .{status_code});
+                    return;
+                }
+            },
+            else => {
+                std.log.err("failed to change pin", .{});
+                return;
+            },
+        }
+    } else { // set a new PIN
+        const spr = client.setPin(
+            device.?,
+            &shared_secret,
+            newPin,
+            a,
+        ) catch |e| {
+            std.log.err("failed to set pin: {any}", .{e});
+            return;
+        };
+        _ = spr;
+    }
+
+    dvui.toast(@src(), .{ .window = win, .message = "PIN successfully changed" });
+}
+
+fn get_device_info(
     win: *dvui.Window,
     uniqueId: dvui.Id,
     local: anytype,
     a: std.mem.Allocator,
 ) void {
-    if (local.choice == null) return;
-
-    std.log.info("opening device", .{});
-
-    var device_ = &local.transports.?.devices[local.choice.?];
-
-    device_.open() catch |e| {
-        std.log.err("failed to open selected device ({any})", .{e});
-        closeDevice(win, uniqueId, a);
-        local.choice = null;
+    if (device == null) {
+        std.log.err("expected open device", .{});
         return;
-    };
+    }
 
-    var info_state_ = client.getInfo(device_) catch |e| {
+    var info_state_ = client.getInfo(device.?) catch |e| {
         std.log.err("failed to obtain device information ({any})", .{e});
         closeDevice(win, uniqueId, a);
         local.choice = null;
@@ -493,8 +1046,29 @@ fn open_device(
         return;
     };
 
-    device = device_;
     deviceInfo = info;
+}
+
+fn open_device(
+    win: *dvui.Window,
+    uniqueId: dvui.Id,
+    local: anytype,
+    a: std.mem.Allocator,
+) void {
+    if (local.choice == null) return;
+
+    std.log.info("opening device", .{});
+
+    var device_ = &local.transports.?.devices[local.choice.?];
+
+    device_.open() catch |e| {
+        std.log.err("failed to open selected device ({any})", .{e});
+        closeDevice(win, uniqueId, a);
+        local.choice = null;
+        return;
+    };
+
+    device = device_;
 }
 
 fn list_available_devices(
@@ -659,11 +1233,11 @@ fn list_available_devices(
 //
 //    dvui.toast(@src(), .{ .window = win, .message = "Database unlocked successfully" });
 //}
-//
-//pub fn getSlice(s: []const u8) []const u8 {
-//    for (s, 0..) |c, i|
-//        if (c == 0) return s[0..i];
-//    return s;
-//}
+
+pub fn getSlice(s: []const u8) []const u8 {
+    for (s, 0..) |c, i|
+        if (c == 0) return s[0..i];
+    return s;
+}
 
 test {}
