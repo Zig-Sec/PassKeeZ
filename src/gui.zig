@@ -111,16 +111,12 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
     _ = uniqueId;
 
     const local = struct {
-        var password: [128]u8 = .{0} ** 128;
-
         var transport_labels: ?std.ArrayList([]const u8) = null;
         var transports: ?client.Transports = null;
         var loading_transports: bool = false;
         var choice: ?usize = null;
         var selected_device: ?*client.Transports.Transport = null;
         var info: ?client.Info = null;
-
-        var spinner_active: bool = false;
 
         pub fn closeDevice() void {
             if (selected_device) |dev| {
@@ -135,8 +131,6 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
             }
         }
     };
-
-    var enter_pressed = false;
 
     // Load list of available devices
     if (local.transports == null and !local.loading_transports) blk: {
@@ -168,199 +162,127 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
     var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
     defer scroll.deinit();
 
+    try drawDeviceSelectorWidget(&local);
+}
+
+fn drawDeviceSelectorWidget(
+    local: anytype,
+) !void {
     var left_alignment = dvui.Alignment.init(@src(), 0);
     defer left_alignment.deinit();
 
+    var inner_vbox = dvui.box(
+        @src(),
+        .{ .dir = .vertical },
+        .{
+            .gravity_x = 0.5,
+            .min_size_content = .width(360.0),
+        },
+    );
+    defer inner_vbox.deinit();
+
     {
-        var inner_vbox = dvui.box(
-            @src(),
-            .{ .dir = .vertical },
-            .{
-                .gravity_x = 0.5,
-                .gravity_y = 0.5,
-                .min_size_content = .width(360.0),
-            },
-        );
-        defer inner_vbox.deinit();
+        var hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer hbox.deinit();
 
-        {
-            var hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
-            defer hbox.deinit();
+        dvui.label(@src(), "Device", .{}, .{ .gravity_y = 0.5 });
 
-            dvui.label(@src(), "Device", .{}, .{ .gravity_y = 0.5 });
+        left_alignment.spacer(@src(), 0);
 
-            left_alignment.spacer(@src(), 0);
-
-            if (local.transport_labels) |labels| {
-                if (dvui.dropdown(
-                    @src(),
-                    labels.items,
-                    .{ .choice_nullable = &local.choice },
-                    .{},
-                    .{
-                        .gravity_y = 0.5,
-                        .corner_radius = .all(0),
-                        .expand = .horizontal,
-                    },
-                )) blk: {
-                    if (local.choice) |i| {
-                        std.log.info("selected device [{d}] '{s}'", .{ i, local.transport_labels.?.items[i] });
-
-                        local.closeDevice();
-
-                        const bg_thread = std.Thread.spawn(
-                            .{},
-                            open_device,
-                            .{
-                                &local,
-                                gpa,
-                            },
-                        ) catch |err| {
-                            dvui.log.err(
-                                "failed to spawn background thread to open device ({any})",
-                                .{err},
-                            );
-                            break :blk;
-                        };
-                        bg_thread.detach();
-                    } else {
-                        std.log.info("deselected device", .{});
-                        local.closeDevice();
-                    }
-                }
-            } else {
-                _ = dvui.dropdown(
-                    @src(),
-                    &.{},
-                    .{ .choice_nullable = &local.choice },
-                    .{},
-                    .{
-                        .gravity_y = 0.5,
-                        .corner_radius = .all(0),
-                        .expand = .horizontal,
-                    },
-                );
-            }
-
-            var ttout: dvui.WidgetData = undefined;
-            if (dvui.buttonIcon(
+        if (local.transport_labels) |labels| {
+            if (dvui.dropdown(
                 @src(),
-                "refresh",
-                dvui.entypo.arrow_with_circle_up,
-                .{},
+                labels.items,
+                .{ .choice_nullable = &local.choice },
                 .{},
                 .{
                     .gravity_y = 0.5,
-                    .data_out = &ttout,
                     .corner_radius = .all(0),
+                    .expand = .horizontal,
                 },
-            )) {
-                if (!local.loading_transports) blk: {
-                    local.loading_transports = true;
+            )) blk: {
+                if (local.choice) |i| {
+                    std.log.info("selected device [{d}] '{s}'", .{ i, local.transport_labels.?.items[i] });
+
+                    local.closeDevice();
 
                     const bg_thread = std.Thread.spawn(
                         .{},
-                        list_available_devices,
+                        open_device,
                         .{
-                            &local.transports,
-                            &local.transport_labels,
-                            &local.loading_transports,
-                            &local.choice,
+                            local,
                             gpa,
                         },
                     ) catch |err| {
                         dvui.log.err(
-                            "failed to spawn background thread to list devices ({any})",
+                            "failed to spawn background thread to open device ({any})",
                             .{err},
                         );
                         break :blk;
                     };
                     bg_thread.detach();
+                } else {
+                    std.log.info("deselected device", .{});
+                    local.closeDevice();
                 }
             }
-            dvui.tooltip(
+        } else {
+            _ = dvui.dropdown(
                 @src(),
-                .{ .active_rect = ttout.borderRectScale().r },
-                "Update list of available devices",
+                &.{},
+                .{ .choice_nullable = &local.choice },
                 .{},
-                .{},
-            );
-        }
-
-        {
-            var hbox = dvui.box(
-                @src(),
-                .{ .dir = .horizontal },
-                .{ .expand = .horizontal },
-            );
-            defer hbox.deinit();
-
-            dvui.label(@src(), "Password", .{}, .{
-                .gravity_y = 0.5,
-            });
-
-            left_alignment.spacer(@src(), 0);
-
-            var te = dvui.textEntry(
-                @src(),
                 .{
-                    .text = .{ .buffer = &local.password },
-                    .password_char = "*",
-                },
-                .{
-                    .expand = .horizontal,
                     .gravity_y = 0.5,
                     .corner_radius = .all(0),
+                    .expand = .horizontal,
                 },
             );
-            // Fucus on the password entry
-            if (dvui.firstFrame(te.data().id)) {
-                dvui.focusWidget(te.data().id, null, null);
-            }
-
-            // Check if the user pressed enter. We treat this the same as clicking the
-            // button below.
-            enter_pressed = te.enter_pressed;
-
-            te.deinit();
         }
 
-        if (local.spinner_active) {
-            dvui.spinner(
-                @src(),
-                .{
-                    .color_text = .{ .r = 100, .g = 200, .b = 100 },
-                    .gravity_x = 0.5,
-                },
-            );
-        } else {
-            if (dvui.button(@src(), "connect", .{}, .{
-                .expand = .horizontal,
+        var ttout: dvui.WidgetData = undefined;
+        if (dvui.buttonIcon(
+            @src(),
+            "refresh",
+            dvui.entypo.cycle,
+            .{},
+            .{},
+            .{
+                .gravity_y = 0.5,
+                .data_out = &ttout,
                 .corner_radius = .all(0),
-            }) or enter_pressed) {
-                local.spinner_active = true;
+            },
+        )) {
+            if (!local.loading_transports) blk: {
+                local.loading_transports = true;
 
-                //const bg_thread = std.Thread.spawn(
-                //    .{},
-                //    unlock_database_process,
-                //    .{
-                //        dvui.currentWindow(),
-                //        &local.path,
-                //        &local.password,
-                //        gpa,
-                //        uniqueId,
-                //        &local.spinner_active,
-                //    },
-                //) catch |err| {
-                //    dvui.log.info(
-                //        "failed to spawn background thread to unlock database ({any})",
-                //        .{err},
-                //    );
-                //    break :blk;
-                //};
-                //bg_thread.detach();
+                const bg_thread = std.Thread.spawn(
+                    .{},
+                    list_available_devices,
+                    .{
+                        &local.transports,
+                        &local.transport_labels,
+                        &local.loading_transports,
+                        &local.choice,
+                        gpa,
+                    },
+                ) catch |err| {
+                    dvui.log.err(
+                        "failed to spawn background thread to list devices ({any})",
+                        .{err},
+                    );
+                    break :blk;
+                };
+                bg_thread.detach();
             }
         }
+        dvui.tooltip(
+            @src(),
+            .{ .active_rect = ttout.borderRectScale().r },
+            "Update list of available devices",
+            .{},
+            .{},
+        );
     }
 }
 
