@@ -475,6 +475,23 @@ fn list_available_devices(
             s = s2_;
         }
 
+        if (s.len > 29) {
+            var buffer: [32]u8 = .{0} ** 32;
+            @memcpy(buffer[0..29], s[0..29]);
+            @memcpy(buffer[29..], "...");
+
+            const s3 = a.dupe(u8, buffer[0..]) catch {
+                t.deinit();
+                for (list.items) |item| a.free(item);
+                list.deinit(a);
+                a.free(s);
+                return;
+            };
+
+            a.free(s);
+            s = s3;
+        }
+
         list.append(a, s) catch |e| {
             t.deinit();
             for (list.items) |item| a.free(item);
