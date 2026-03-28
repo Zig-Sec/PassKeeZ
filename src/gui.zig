@@ -1,18 +1,13 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const dvui = @import("dvui");
-const kdbx = @import("kdbx");
-const Config = @import("Config.zig");
-
-const EntryTable = @import("gui/EntryTable.zig");
-
-pub var config: Config = undefined;
+const client = @import("client");
 
 pub const dvui_app: dvui.App = .{
     .config = .{
         .options = .{
-            .size = .{ .w = 1600.0, .h = 900.0 },
-            .min_size = .{ .w = 1000.0, .h = 600.0 },
+            .size = .{ .w = 600.0, .h = 900.0 },
+            .min_size = .{ .w = 400.0, .h = 600.0 },
             .title = "PassKeeZ",
             .window_init_options = .{
                 // Could set a default theme here
@@ -41,9 +36,6 @@ var window: *dvui.Window = undefined;
 // Runs before the first frame, after backend and dvui.Window.init()
 // - runs between win.begin()/win.end()
 pub fn AppInit(win: *dvui.Window) !void {
-    // Load configuration
-    config = try Config.load(gpa);
-
     orig_content_scale = win.content_scale;
 
     //if (false) {
@@ -59,10 +51,7 @@ pub fn AppInit(win: *dvui.Window) !void {
 }
 
 // Run as app is shutting down before dvui.Window.deinit()
-pub fn AppDeinit() void {
-    close_database(window, uId);
-    config.deinit(gpa);
-}
+pub fn AppDeinit() void {}
 
 // Run each frame to do normal UI
 pub fn AppFrame() !dvui.App.Result {
@@ -70,7 +59,16 @@ pub fn AppFrame() !dvui.App.Result {
 }
 
 pub fn frame() !dvui.App.Result {
-    var scaler = dvui.scale(@src(), .{ .scale = &dvui.currentWindow().content_scale, .pinch_zoom = .global }, .{ .rect = .cast(dvui.windowRect()) });
+    var scaler = dvui.scale(
+        @src(),
+        .{
+            .scale = &dvui.currentWindow().content_scale,
+            .pinch_zoom = .global,
+        },
+        .{
+            .rect = .cast(dvui.windowRect()),
+        },
+    );
     scaler.deinit();
 
     {
@@ -100,309 +98,53 @@ pub fn frame() !dvui.App.Result {
             var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
             defer fw.deinit();
 
-            if (dvui.menuItemLabel(@src(), "New Database", .{}, .{ .expand = .horizontal }) != null) {}
-
-            if (dvui.menuItemLabel(@src(), "Open Database", .{}, .{ .expand = .horizontal }) != null) {}
-
-            _ = dvui.separator(@src(), .{});
-
-            if (dvui.dataGetPtr(null, uId, "database", kdbx.Database) != null) {
-                if (dvui.menuItemLabel(
-                    @src(),
-                    "Close Database",
-                    .{},
-                    .{
-                        .expand = .horizontal,
-                    },
-                ) != null) {
-                    close_database(window, uId);
-                }
-            }
-
-            if (dvui.backend.kind != .web) {
-                if (dvui.menuItemLabel(@src(), "Exit", .{}, .{ .expand = .horizontal }) != null) {
-                    return .close;
-                }
-            }
+            if (dvui.menuItemLabel(@src(), "Disconnect", .{}, .{ .expand = .horizontal }) != null) {}
         }
     }
 
-    if (dvui.dataGetPtr(null, uId, "database", kdbx.Database) != null) {
-        // Show the "data-browser" if the database has been unlocked.
-        var outer_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
-        defer outer_hbox.deinit();
-
-        // The side pannel manely shows the group tree view
-        try sidePannel(window, uId);
-
-        // The entry table shows the entries for the selected group
-        try EntryTable.draw(uId, gpa);
-    } else {
-        // Show the unlock screen if no database hase been unlocked.
-        try loginWidget(uId);
-    }
+    try loginWidget(uId);
 
     return .ok;
 }
 
-pub fn sidePannel(
-    win: *dvui.Window,
-    uniqueId: dvui.Id,
-) !void {
-    const local = struct {
-        var searchBuffer: [128]u8 = .{0} ** 128;
-        var searchSlice: []u8 = searchBuffer[0..0];
-    };
-
-    const icon_color: dvui.Color = .{ .r = 0x3c, .g = 0xa3, .b = 0x70, .a = 0xff };
-
-    const recursor = struct {
-        fn search(
-            win_: *dvui.Window,
-            uniqueId_: dvui.Id,
-            group: *kdbx.Group,
-            tree: *dvui.TreeWidget,
-            uid: dvui.Id,
-            branch_options: dvui.Options,
-            expander_options: dvui.Options,
-        ) !void {
-            var id_extra: usize = 0;
-            for (group.groups.items) |*inner_group| {
-                id_extra += 1;
-
-                var branch_opts_override = dvui.Options{
-                    .id_extra = id_extra,
-                    .expand = .horizontal,
-                    .corner_radius = .all(0),
-                };
-
-                const color = icon_color;
-
-                const branch = tree.branch(@src(), .{
-                    .expanded = false,
-                }, branch_opts_override.override(branch_options));
-                defer branch.deinit();
-
-                _ = dvui.icon(
-                    @src(),
-                    "FolderIcon",
-                    dvui.entypo.folder,
-                    .{
-                        .fill_color = icon_color,
-                    },
-                    .{
-                        .gravity_y = 0.5,
-                        .padding = dvui.Rect.all(4),
-                    },
-                );
-                dvui.label(@src(), "{s}", .{inner_group.name}, .{
-                    .color_text = dvui.themeGet().color(.control, .text),
-                    .padding = dvui.Rect.all(4),
-                });
-
-                if (branch.button.clicked()) {
-                    dvui.dataSet(win_, uniqueId_, "group", inner_group);
-                }
-
-                if (inner_group.groups.items.len > 0) {
-                    _ = dvui.icon(
-                        @src(),
-                        "DropIcon",
-                        if (branch.expanded) dvui.entypo.triangle_down else dvui.entypo.triangle_right,
-                        .{ .fill_color = icon_color },
-                        .{
-                            .gravity_y = 0.5,
-                            .gravity_x = 1.0,
-                            .padding = dvui.Rect.all(4),
-                        },
-                    );
-
-                    var expander_opts_override = dvui.Options{
-                        .margin = .{ .x = 14 },
-                        .color_border = color,
-                        .expand = .horizontal,
-                        .corner_radius = .all(0),
-                    };
-
-                    if (branch.expander(@src(), .{ .indent = 14 }, expander_opts_override.override(expander_options))) {
-                        try search(
-                            win_,
-                            uniqueId_,
-                            inner_group,
-                            tree,
-                            uid,
-                            branch_options,
-                            expander_options,
-                        );
-                    }
-                }
-            }
-        }
-    }.search;
-
-    var outer_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
-        .min_size_content = .{ .w = 250 },
-        .max_size_content = .size(.{ .w = 250 }),
-        .expand = .vertical,
-        .border = dvui.Rect.all(1),
-        .gravity_x = 0.0,
-    });
-    defer outer_vbox.deinit();
-
-    // Search Bar
-    {
-        var te = dvui.textEntry(
-            @src(),
-            .{ .text = .{ .buffer = &local.searchBuffer } },
-            .{
-                .expand = .horizontal,
-                .corner_radius = .all(0),
-            },
-        );
-        te.deinit();
-
-        const s = getSlice(&local.searchBuffer);
-        if (s.len != local.searchSlice.len or !std.mem.eql(u8, s, local.searchSlice)) {
-            local.searchSlice = local.searchBuffer[0..s.len];
-            for (local.searchSlice) |*item| item.* = std.ascii.toLower(item.*);
-            dvui.dataSetSlice(win, uniqueId, "searchText", local.searchSlice);
-        }
-    }
-
-    // Nav Bar for Groups
-    {
-        const bopts: dvui.Options = .{
-            .margin = dvui.Rect.all(1),
-            .padding = dvui.Rect.all(2),
-            .corner_radius = .all(0),
-        };
-        const eopts: dvui.Options = .{
-            .border = .{ .x = 1 },
-            .corner_radius = dvui.Rect.all(0),
-            .box_shadow = .{
-                .color = .black,
-                .offset = .{ .x = -5, .y = 5 },
-                .shrink = 5,
-                .fade = 10,
-                .alpha = 0.15,
-            },
-        };
-
-        var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
-        defer scroll.deinit();
-
-        if (dvui.dataGetPtr(null, uniqueId, "database", kdbx.Database)) |db| {
-            var tree = dvui.TreeWidget.tree(
-                @src(),
-                .{},
-                .{ .expand = .horizontal },
-            );
-            defer tree.deinit();
-
-            { // Root is always expanded
-                const branch = tree.branch(
-                    @src(),
-                    .{
-                        .expanded = true,
-                    },
-                    .{ .expand = .horizontal },
-                );
-                defer branch.deinit();
-
-                _ = dvui.icon(
-                    @src(),
-                    "FileIcon",
-                    dvui.entypo.folder,
-                    .{ .fill_color = icon_color },
-                    .{
-                        .gravity_y = 0.5,
-                        .padding = dvui.Rect.all(4),
-                    },
-                );
-                dvui.label(@src(), "{s}", .{"Root"}, .{
-                    .color_text = dvui.themeGet().color(.control, .text),
-                    .padding = dvui.Rect.all(4),
-                });
-                _ = dvui.icon(
-                    @src(),
-                    "DropIcon",
-                    if (branch.expanded) dvui.entypo.triangle_down else dvui.entypo.triangle_right,
-                    .{
-                        .fill_color = icon_color,
-                    },
-                    .{
-                        .gravity_y = 0.5,
-                        .gravity_x = 1.0,
-                        .padding = dvui.Rect.all(4),
-                    },
-                );
-
-                if (branch.button.clicked()) {
-                    dvui.dataSet(win, uniqueId, "group", &db.body.root);
-                }
-
-                if (branch.expander(
-                    @src(),
-                    .{ .indent = 14.0 },
-                    .{
-                        .color_fill = dvui.themeGet().color(.window, .fill),
-                        .color_border = icon_color,
-                        .expand = .horizontal,
-                        .corner_radius = branch.button.wd.options.corner_radius,
-                        .background = true,
-                        .border = .{ .x = 1 },
-                        .box_shadow = .{
-                            .color = .black,
-                            .offset = .{ .x = -5, .y = 5 },
-                            .shrink = 5,
-                            .fade = 10,
-                            .alpha = 0.15,
-                        },
-                    },
-                )) {
-                    try recursor(
-                        win,
-                        uniqueId,
-                        &db.body.root,
-                        tree,
-                        uniqueId,
-                        bopts,
-                        eopts,
-                    );
-                }
-            }
-        }
-    }
-}
-
 pub fn loginWidget(uniqueId: dvui.Id) !void {
+    _ = uniqueId;
+
     const local = struct {
         var password: [128]u8 = .{0} ** 128;
-        var path: [4096]u8 = .{0} ** 4096;
+
+        var transport_labels: ?std.ArrayList([]const u8) = null;
+        var transports: ?client.Transports = null;
+        var loading_transports: bool = false;
+        var choice: ?usize = null;
+
         var spinner_active: bool = false;
-
-        pub fn setPath(p: []const u8) void {
-            @memset(&path, 0);
-            @memcpy(path[0..p.len], p);
-        }
-
-        pub fn setPw(p: []const u8) void {
-            std.crypto.secureZero(u8, &password);
-            @memcpy(password[0..p.len], p);
-        }
-
-        var first: bool = true;
-
-        pub fn setData() void {
-            @memcpy(path[0..config.db_path.len], config.db_path);
-        }
     };
 
     var enter_pressed = false;
 
-    if (local.first) {
-        local.first = false;
-        local.setData();
+    // Load list of available devices
+    if (local.transports == null and !local.loading_transports) blk: {
+        local.loading_transports = true;
+
+        const bg_thread = std.Thread.spawn(
+            .{},
+            list_available_devices,
+            .{
+                &local.transports,
+                &local.transport_labels,
+                &local.loading_transports,
+                &local.choice,
+                gpa,
+            },
+        ) catch |err| {
+            dvui.log.err(
+                "failed to spawn background thread to list devices ({any})",
+                .{err},
+            );
+            break :blk;
+        };
+        bg_thread.detach();
     }
 
     var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
@@ -430,25 +172,41 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
             var hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
             defer hbox.deinit();
 
-            dvui.label(@src(), "Path", .{}, .{ .gravity_y = 0.5 });
+            dvui.label(@src(), "Device", .{}, .{ .gravity_y = 0.5 });
 
             left_alignment.spacer(@src(), 0);
 
-            var te = dvui.textEntry(
-                @src(),
-                .{ .text = .{ .buffer = &local.path } },
-                .{
-                    .expand = .horizontal,
-                    .corner_radius = .all(0),
-                },
-            );
-            te.deinit();
+            if (local.transport_labels) |labels| {
+                _ = dvui.dropdown(
+                    @src(),
+                    labels.items,
+                    .{ .choice_nullable = &local.choice },
+                    .{},
+                    .{
+                        .gravity_y = 0.5,
+                        .corner_radius = .all(0),
+                        .expand = .horizontal,
+                    },
+                );
+            } else {
+                _ = dvui.dropdown(
+                    @src(),
+                    &.{},
+                    .{ .choice_nullable = &local.choice },
+                    .{},
+                    .{
+                        .gravity_y = 0.5,
+                        .corner_radius = .all(0),
+                        .expand = .horizontal,
+                    },
+                );
+            }
 
             var ttout: dvui.WidgetData = undefined;
             if (dvui.buttonIcon(
                 @src(),
-                "folder",
-                dvui.entypo.folder,
+                "refresh",
+                dvui.entypo.arrow_with_circle_up,
                 .{},
                 .{},
                 .{
@@ -457,21 +215,33 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
                     .corner_radius = .all(0),
                 },
             )) {
-                const filename = dvui.dialogNativeFileOpen(
-                    dvui.currentWindow().arena(),
-                    .{ .title = "Select Database File" },
-                ) catch |err| blk: {
-                    dvui.log.debug("unable to select file ({any})", .{err});
-                    break :blk null;
-                };
-                if (filename) |f| {
-                    local.setPath(f);
+                if (!local.loading_transports) blk: {
+                    local.loading_transports = true;
+
+                    const bg_thread = std.Thread.spawn(
+                        .{},
+                        list_available_devices,
+                        .{
+                            &local.transports,
+                            &local.transport_labels,
+                            &local.loading_transports,
+                            &local.choice,
+                            gpa,
+                        },
+                    ) catch |err| {
+                        dvui.log.err(
+                            "failed to spawn background thread to list devices ({any})",
+                            .{err},
+                        );
+                        break :blk;
+                    };
+                    bg_thread.detach();
                 }
             }
             dvui.tooltip(
                 @src(),
                 .{ .active_rect = ttout.borderRectScale().r },
-                "Select a database file",
+                "Update list of available devices",
                 .{},
                 .{},
             );
@@ -524,102 +294,176 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
                 },
             );
         } else {
-            if (dvui.button(@src(), "unlock", .{}, .{
+            if (dvui.button(@src(), "connect", .{}, .{
                 .expand = .horizontal,
                 .corner_radius = .all(0),
-            }) or enter_pressed) blk: {
+            }) or enter_pressed) {
                 local.spinner_active = true;
 
-                const bg_thread = std.Thread.spawn(
-                    .{},
-                    unlock_database_process,
-                    .{
-                        dvui.currentWindow(),
-                        &local.path,
-                        &local.password,
-                        gpa,
-                        uniqueId,
-                        &local.spinner_active,
-                    },
-                ) catch |err| {
-                    dvui.log.info(
-                        "failed to spawn background thread to unlock database ({any})",
-                        .{err},
-                    );
-                    break :blk;
-                };
-                bg_thread.detach();
+                //const bg_thread = std.Thread.spawn(
+                //    .{},
+                //    unlock_database_process,
+                //    .{
+                //        dvui.currentWindow(),
+                //        &local.path,
+                //        &local.password,
+                //        gpa,
+                //        uniqueId,
+                //        &local.spinner_active,
+                //    },
+                //) catch |err| {
+                //    dvui.log.info(
+                //        "failed to spawn background thread to unlock database ({any})",
+                //        .{err},
+                //    );
+                //    break :blk;
+                //};
+                //bg_thread.detach();
             }
         }
     }
 }
 
-fn close_database(
-    win: ?*dvui.Window,
-    uniqueId: dvui.Id,
-) void {
-    if (dvui.dataGetPtr(win, uniqueId, "database", kdbx.Database)) |database| {
-        database.deinit();
-        dvui.dataRemove(win, uniqueId, "database");
-    }
-}
-
-fn unlock_database_process(
-    win: *dvui.Window,
-    path_: []const u8,
-    pw_: []u8,
+fn list_available_devices(
+    transports: *?client.Transports,
+    transport_labels: *?std.ArrayListUnmanaged([]const u8),
+    loading_transports: *bool,
+    choice: *?usize,
     a: std.mem.Allocator,
-    uniqueId: dvui.Id,
-    spinner_active: *bool,
 ) void {
-    defer spinner_active.* = false;
-    defer std.crypto.secureZero(u8, pw_);
+    defer {
+        loading_transports.* = false;
+        choice.* = null;
+    }
 
-    const path = getSlice(path_);
-    const pw = getSlice(pw_);
+    std.log.info("enumerating available FIDO devices", .{});
 
-    var f = std.fs.openFileAbsolute(path, .{}) catch {
-        dvui.log.info(
-            "unable to open database file '{s}'",
-            .{path},
-        );
-        return;
-    };
-    defer f.close();
-
-    var buffer: [1024]u8 = undefined;
-    var reader = f.reader(&buffer);
-
-    const key = kdbx.DatabaseKey{
-        .password = a.dupe(u8, getSlice(pw)) catch return,
-        .allocator = a,
-    };
-    defer key.deinit();
-
-    const database = kdbx.Database.open(&reader.interface, .{
-        .allocator = a,
-        .key = key,
-    }) catch |e| {
-        dvui.log.info(
-            "unable to unlock database '{s}' ({any})",
-            .{ path, e },
-        );
-        dvui.toast(@src(), .{ .window = win, .message = "Unlocking the database failed.\nDid you provide the correct password?" });
+    const t = client.Transports.enumerate(
+        a,
+        .{},
+    ) catch |e| {
+        std.log.err("enumerating available devices failed ({any})", .{e});
         return;
     };
 
-    dvui.dataSet(win, uniqueId, "database", database);
+    var list: std.ArrayListUnmanaged([]const u8) = .empty;
+    for (t.devices) |*dev| {
+        var s = dev.allocPrint(a) catch |e| {
+            t.deinit();
+            for (list.items) |item| a.free(item);
+            list.deinit(a);
 
-    const root_ptr = &dvui.dataGetPtr(win, uniqueId, "database", kdbx.Database).?.body.root;
-    dvui.dataSet(win, uniqueId, "group", root_ptr);
+            std.log.err("failed to alloc device label ({any})", .{e});
+            return;
+        };
 
-    dvui.toast(@src(), .{ .window = win, .message = "Database unlocked successfully" });
+        std.log.info("{s}", .{s});
+
+        if (std.unicode.utf8ValidateSlice(s)) {
+            var s2 = std.Io.Writer.Allocating.init(a);
+            var writer = &s2.writer;
+            var view = std.unicode.Utf8View.init(s) catch unreachable; // we have already checked that it's valid utf8
+            var iter = view.iterator();
+
+            while (iter.nextCodepoint()) |i| {
+                const b = @as(u8, @intCast(i & 0xff));
+
+                if (b != 0) {
+                    writer.writeByte(b) catch {
+                        return;
+                    };
+                }
+            }
+
+            const s2_ = s2.toOwnedSlice() catch {
+                return;
+            };
+
+            a.free(s);
+            s = s2_;
+        }
+
+        list.append(a, s) catch |e| {
+            t.deinit();
+            for (list.items) |item| a.free(item);
+            list.deinit(a);
+
+            std.log.err("failed to append device label ({any})", .{e});
+            return;
+        };
+    }
+
+    std.log.info("{d} devices available", .{t.devices.len});
+
+    if (transports.* != null) {
+        std.log.info("deallocating old device list", .{});
+        transports.*.?.deinit();
+
+        for (transport_labels.*.?.items) |item| a.free(item);
+        transport_labels.*.?.deinit(a);
+    }
+
+    std.log.info("assigning new device list", .{});
+    transports.* = t;
+    transport_labels.* = list;
 }
 
-pub fn getSlice(s: []const u8) []const u8 {
-    for (s, 0..) |c, i|
-        if (c == 0) return s[0..i];
-    return s;
-}
+//fn unlock_database_process(
+//    win: *dvui.Window,
+//    path_: []const u8,
+//    pw_: []u8,
+//    a: std.mem.Allocator,
+//    uniqueId: dvui.Id,
+//    spinner_active: *bool,
+//) void {
+//    defer spinner_active.* = false;
+//    defer std.crypto.secureZero(u8, pw_);
+//
+//    const path = getSlice(path_);
+//    const pw = getSlice(pw_);
+//
+//    var f = std.fs.openFileAbsolute(path, .{}) catch {
+//        dvui.log.info(
+//            "unable to open database file '{s}'",
+//            .{path},
+//        );
+//        return;
+//    };
+//    defer f.close();
+//
+//    var buffer: [1024]u8 = undefined;
+//    var reader = f.reader(&buffer);
+//
+//    const key = kdbx.DatabaseKey{
+//        .password = a.dupe(u8, getSlice(pw)) catch return,
+//        .allocator = a,
+//    };
+//    defer key.deinit();
+//
+//    const database = kdbx.Database.open(&reader.interface, .{
+//        .allocator = a,
+//        .key = key,
+//    }) catch |e| {
+//        dvui.log.info(
+//            "unable to unlock database '{s}' ({any})",
+//            .{ path, e },
+//        );
+//        dvui.toast(@src(), .{ .window = win, .message = "Unlocking the database failed.\nDid you provide the correct password?" });
+//        return;
+//    };
+//
+//    dvui.dataSet(win, uniqueId, "database", database);
+//
+//    const root_ptr = &dvui.dataGetPtr(win, uniqueId, "database", kdbx.Database).?.body.root;
+//    dvui.dataSet(win, uniqueId, "group", root_ptr);
+//
+//    dvui.toast(@src(), .{ .window = win, .message = "Database unlocked successfully" });
+//}
+//
+//pub fn getSlice(s: []const u8) []const u8 {
+//    for (s, 0..) |c, i|
+//        if (c == 0) return s[0..i];
+//    return s;
+//}
 
 test {}

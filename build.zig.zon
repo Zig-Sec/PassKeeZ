@@ -13,12 +13,12 @@
             .hash = "kdbx-0.3.0-eJXZBCGiEwA7A8gVK3rpmn6AfrNniGR0XnhGx3TYvVqf",
         },
         .keylib = .{
-            .url = "https://codeberg.org/r4gus/keylib/archive/0.9.0.tar.gz",
-            .hash = "keylib-0.8.1-mbYjk9EgCwDrCXP_PwhNt6aqU9ebpKKhyz_fN1ZavfV1",
+            .url = "https://codeberg.org/r4gus/keylib/archive/0.9.1.tar.gz",
+            .hash = "keylib-0.9.1-mbYjk9IgCwAJbAejXX7o3wuXNHxDjFN9HtL4L5rUOQSt",
         },
         .dvui = .{
-            .url = "git+https://github.com/david-vanderson/dvui?ref=main#c9a984f9c583bdb4c650423bbd5890fda6d1d26a",
-            .hash = "dvui-0.4.0-dev-AQFJmfR41gAOOAUVjRweL3nKPmXRkVT6HmAInb-Kjni5",
+            .url = "git+https://github.com/david-vanderson/dvui#4e0261b061258c9c4752c3fe384ab4f5da56a7a7",
+            .hash = "dvui-0.4.0-dev-AQFJmS--3wANx5NhfSO0dzJ2ylKV5zLY89nKnK3KnJf7",
         },
     },
     .paths = .{

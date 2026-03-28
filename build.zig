@@ -21,7 +21,11 @@ pub fn build(b: *std.Build) void {
 
     const dvui_dep = b.dependency(
         "dvui",
-        .{ .target = target, .optimize = optimize, .backend = .sdl3 },
+        .{
+            .target = target,
+            .optimize = optimize,
+            .backend = .sdl3,
+        },
     );
 
     const exe = b.addExecutable(.{
@@ -70,6 +74,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .root_source_file = b.path("src/gui.zig"),
             .imports = &.{
+                .{ .name = "client", .module = keylib_dep.module("clientlib") },
                 .{ .name = "kdbx", .module = kdbx_dep.module("kdbx") },
                 .{ .name = "uuid", .module = uuid_dep.module("uuid") },
                 .{ .name = "dvui", .module = dvui_dep.module("dvui_sdl3") },
