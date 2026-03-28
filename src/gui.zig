@@ -117,8 +117,23 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
         var transports: ?client.Transports = null;
         var loading_transports: bool = false;
         var choice: ?usize = null;
+        var selected_device: ?*client.Transports.Transport = null;
+        var info: ?client.Info = null;
 
         var spinner_active: bool = false;
+
+        pub fn closeDevice() void {
+            if (selected_device) |dev| {
+                std.log.info("closing old device", .{});
+                dev.close();
+                selected_device = null;
+            }
+
+            if (info != null) {
+                info.?.deinit(gpa);
+                info = null;
+            }
+        }
     };
 
     var enter_pressed = false;
@@ -177,7 +192,7 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
             left_alignment.spacer(@src(), 0);
 
             if (local.transport_labels) |labels| {
-                _ = dvui.dropdown(
+                if (dvui.dropdown(
                     @src(),
                     labels.items,
                     .{ .choice_nullable = &local.choice },
@@ -187,7 +202,32 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
                         .corner_radius = .all(0),
                         .expand = .horizontal,
                     },
-                );
+                )) blk: {
+                    if (local.choice) |i| {
+                        std.log.info("selected device [{d}] '{s}'", .{ i, local.transport_labels.?.items[i] });
+
+                        local.closeDevice();
+
+                        const bg_thread = std.Thread.spawn(
+                            .{},
+                            open_device,
+                            .{
+                                &local,
+                                gpa,
+                            },
+                        ) catch |err| {
+                            dvui.log.err(
+                                "failed to spawn background thread to open device ({any})",
+                                .{err},
+                            );
+                            break :blk;
+                        };
+                        bg_thread.detach();
+                    } else {
+                        std.log.info("deselected device", .{});
+                        local.closeDevice();
+                    }
+                }
             } else {
                 _ = dvui.dropdown(
                     @src(),
@@ -324,6 +364,48 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
     }
 }
 
+fn open_device(
+    local: anytype,
+    a: std.mem.Allocator,
+) void {
+    if (local.choice == null) return;
+
+    std.log.info("opening device", .{});
+
+    local.selected_device = &local.transports.?.devices[local.choice.?];
+
+    local.selected_device.?.open() catch |e| {
+        std.log.err("failed to open selected device ({any})", .{e});
+        local.closeDevice();
+        local.choice = null;
+        return;
+    };
+
+    var info_state_ = client.getInfo(local.selected_device.?) catch |e| {
+        std.log.err("failed to obtain device information ({any})", .{e});
+        local.closeDevice();
+        local.choice = null;
+        return;
+    };
+
+    var info_state = info_state_.await(a) catch |e| {
+        std.log.err("failed to obtain device information ({any})", .{e});
+        local.closeDevice();
+        local.choice = null;
+        return;
+    };
+    defer info_state.deinit(a);
+
+    std.log.info("[cbor]: {x}", .{info_state.fulfilled});
+
+    local.info = info_state.deserializeCbor(client.Info, a) catch |e| {
+        std.log.err("failed to deserialize info CBOR data ({any})", .{e});
+        local.closeDevice();
+        local.choice = null;
+        return;
+    };
+}
+
 fn list_available_devices(
     transports: *?client.Transports,
     transport_labels: *?std.ArrayListUnmanaged([]const u8),
@@ -370,12 +452,22 @@ fn list_available_devices(
 
                 if (b != 0) {
                     writer.writeByte(b) catch {
+                        t.deinit();
+                        for (list.items) |item| a.free(item);
+                        list.deinit(a);
+                        a.free(s);
+                        s2.deinit();
                         return;
                     };
                 }
             }
 
             const s2_ = s2.toOwnedSlice() catch {
+                t.deinit();
+                for (list.items) |item| a.free(item);
+                list.deinit(a);
+                a.free(s);
+                s2.deinit();
                 return;
             };
 
