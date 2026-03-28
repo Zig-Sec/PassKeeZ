@@ -343,6 +343,8 @@ fn drawDeviceSelectorWidget(
             },
         )) {
             if (!local.loading_transports) blk: {
+                closeDevice(win, uniqueId, allocator);
+
                 local.loading_transports = true;
 
                 const bg_thread = std.Thread.spawn(
