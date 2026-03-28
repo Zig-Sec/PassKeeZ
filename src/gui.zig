@@ -8,6 +8,7 @@ pub const dvui_app: dvui.App = .{
         .options = .{
             .size = .{ .w = 600.0, .h = 900.0 },
             .min_size = .{ .w = 400.0, .h = 600.0 },
+            .max_size = .{ .w = 800.0, .h = 1200.0 },
             .title = "PassKeeZ",
             .window_init_options = .{
                 // Could set a default theme here
@@ -32,6 +33,29 @@ var orig_content_scale: f32 = 1.0;
 
 var uId: dvui.Id = undefined;
 var window: *dvui.Window = undefined;
+
+pub const MenuKind = enum {
+    none,
+    change_password,
+
+    pub fn name(self: @This()) []const u8 {
+        return switch (self) {
+            .none => "None",
+            .change_password => "Change Password",
+        };
+    }
+
+    pub fn scaleOffset(self: @This()) struct { scale: f32, offset: dvui.Point } {
+        return switch (self) {
+            .none => .{ .scale = 0.45, .offset = .{} },
+            .change_password => .{ .scale = 0.45, .offset = .{} },
+        };
+    }
+};
+
+var menu_active = MenuKind.none;
+var deviceInfo: ?client.Info = null;
+var device: ?*client.Transports.Transport = null;
 
 // Runs before the first frame, after backend and dvui.Window.init()
 // - runs between win.begin()/win.end()
@@ -116,30 +140,52 @@ pub fn loginWidget(
     uniqueId: dvui.Id,
     allocator: std.mem.Allocator,
 ) !void {
-    var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
-    defer vbox.deinit();
+    var paned = dvui.paned(@src(), .{ .direction = .horizontal, .collapsed_size = 1200 }, .{ .expand = .both, .background = false });
 
-    var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
-    defer scroll.deinit();
+    if (paned.showFirst()) {
+        var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
+        defer vbox.deinit();
 
-    try drawDeviceSelectorWidget(
-        win,
-        uniqueId,
-        allocator,
-    );
+        var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
+        defer scroll.deinit();
 
-    try drawDeviceInfo(
-        window,
-        uniqueId,
-        allocator,
-    );
+        try drawDeviceSelectorWidget(
+            win,
+            uniqueId,
+            allocator,
+        );
+
+        try drawDeviceInfo(
+            window,
+            uniqueId,
+            allocator,
+            paned,
+        );
+    }
+
+    if (paned.showSecond()) {
+        var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
+        defer vbox.deinit();
+
+        var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
+        defer scroll.deinit();
+
+        if (paned.collapsed() and dvui.button(@src(), "Back", .{}, .{ .min_size_content = .{ .h = 30 } })) {
+            paned.animateSplit(1.0);
+        }
+    }
+
+    paned.deinit();
 }
 
 fn drawDeviceInfo(
     win: *dvui.Window,
     uniqueId: dvui.Id,
     allocator: std.mem.Allocator,
+    paned: *dvui.PanedWidget,
 ) !void {
+    _ = win;
+    _ = uniqueId;
     _ = allocator;
 
     var left_alignment = dvui.Alignment.init(@src(), 0);
@@ -156,15 +202,7 @@ fn drawDeviceInfo(
     );
     defer inner_vbox.deinit();
 
-    if (dvui.dataGetPtr(
-        win,
-        uniqueId,
-        "deviceInfo",
-        client.Info,
-    )) |info| {
-        const dev = dvui.dataGet(win, uniqueId, "device", *client.Transports.Transport).?;
-        _ = dev;
-
+    if (deviceInfo) |info| {
         {
             var hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
             defer hbox.deinit();
@@ -212,6 +250,20 @@ fn drawDeviceInfo(
 
                     if (info.forcePINChange != null and info.forcePINChange.?) {
                         dvui.label(@src(), "forcePINChange", .{}, .{});
+                    }
+                }
+
+                if (dvui.button(
+                    @src(),
+                    if (cp) "Change PIN" else "Set PIN",
+                    .{},
+                    .{
+                        .expand = .horizontal,
+                    },
+                )) {
+                    menu_active = .change_password;
+                    if (paned.collapsed()) {
+                        paned.animateSplit(0.0);
                     }
                 }
             }
@@ -382,27 +434,20 @@ pub fn closeDevice(
     uniqueId: dvui.Id,
     allocator: std.mem.Allocator,
 ) void {
-    if (dvui.dataGet(
-        win,
-        uniqueId,
-        "device",
-        *client.Transports.Transport,
-    )) |t| {
-        std.log.info("closing old device", .{});
-        t.close();
-    }
-    dvui.dataRemove(win, uniqueId, "device");
+    _ = win;
+    _ = uniqueId;
 
-    if (dvui.dataGet(
-        win,
-        uniqueId,
-        "deviceInfo",
-        client.Info,
-    )) |info| {
+    if (device) |dev| {
+        std.log.info("closing old device", .{});
+        dev.close();
+    }
+    device = null;
+
+    if (deviceInfo) |info| {
         std.log.info("deallocating device info", .{});
         info.deinit(allocator);
     }
-    dvui.dataRemove(win, uniqueId, "deviceInfo");
+    deviceInfo = null;
 }
 
 fn open_device(
@@ -415,16 +460,16 @@ fn open_device(
 
     std.log.info("opening device", .{});
 
-    var device = &local.transports.?.devices[local.choice.?];
+    var device_ = &local.transports.?.devices[local.choice.?];
 
-    device.open() catch |e| {
+    device_.open() catch |e| {
         std.log.err("failed to open selected device ({any})", .{e});
         closeDevice(win, uniqueId, a);
         local.choice = null;
         return;
     };
 
-    var info_state_ = client.getInfo(device) catch |e| {
+    var info_state_ = client.getInfo(device_) catch |e| {
         std.log.err("failed to obtain device information ({any})", .{e});
         closeDevice(win, uniqueId, a);
         local.choice = null;
@@ -448,8 +493,8 @@ fn open_device(
         return;
     };
 
-    dvui.dataSet(win, uniqueId, "device", device);
-    dvui.dataSet(win, uniqueId, "deviceInfo", info);
+    device = device_;
+    deviceInfo = info;
 }
 
 fn list_available_devices(
