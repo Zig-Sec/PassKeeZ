@@ -51,7 +51,11 @@ pub fn AppInit(win: *dvui.Window) !void {
 }
 
 // Run as app is shutting down before dvui.Window.deinit()
-pub fn AppDeinit() void {}
+pub fn AppDeinit() void {
+    closeDevice(window, uId, gpa);
+
+    //_ = gpa_instance.detectLeaks();
+}
 
 // Run each frame to do normal UI
 pub fn AppFrame() !dvui.App.Result {
@@ -102,34 +106,129 @@ pub fn frame() !dvui.App.Result {
         }
     }
 
-    try loginWidget(uId);
+    try loginWidget(window, uId, gpa);
 
     return .ok;
 }
 
-pub fn loginWidget(uniqueId: dvui.Id) !void {
-    _ = uniqueId;
+pub fn loginWidget(
+    win: *dvui.Window,
+    uniqueId: dvui.Id,
+    allocator: std.mem.Allocator,
+) !void {
+    var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
+    defer vbox.deinit();
 
+    var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
+    defer scroll.deinit();
+
+    try drawDeviceSelectorWidget(
+        win,
+        uniqueId,
+        allocator,
+    );
+
+    try drawDeviceInfo(
+        window,
+        uniqueId,
+        allocator,
+    );
+}
+
+fn drawDeviceInfo(
+    win: *dvui.Window,
+    uniqueId: dvui.Id,
+    allocator: std.mem.Allocator,
+) !void {
+    _ = allocator;
+
+    var left_alignment = dvui.Alignment.init(@src(), 0);
+    defer left_alignment.deinit();
+
+    var inner_vbox = dvui.box(
+        @src(),
+        .{ .dir = .vertical },
+        .{
+            .gravity_x = 0.5,
+            .gravity_y = 0.5,
+            .min_size_content = .width(360.0),
+        },
+    );
+    defer inner_vbox.deinit();
+
+    if (dvui.dataGetPtr(
+        win,
+        uniqueId,
+        "deviceInfo",
+        client.Info,
+    )) |info| {
+        const dev = dvui.dataGet(win, uniqueId, "device", *client.Transports.Transport).?;
+        _ = dev;
+
+        {
+            var hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+            defer hbox.deinit();
+
+            dvui.label(@src(), "AAGUID:", .{}, .{});
+
+            left_alignment.spacer(@src(), 0);
+
+            dvui.label(@src(), "{x}", .{&info.aaguid}, .{});
+        }
+
+        if (info.options.clientPin) |cp| {
+            {
+                var gbox = dvui.groupBox(@src(), "Password Settings", .{ .expand = .horizontal });
+                defer gbox.deinit();
+
+                var left_alignment2 = dvui.Alignment.init(@src(), 0);
+                defer left_alignment2.deinit();
+
+                {
+                    var hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .padding = .{ .x = 10 } });
+                    defer hbox.deinit();
+
+                    dvui.label(@src(), "PIN set:", .{}, .{});
+
+                    left_alignment2.spacer(@src(), 0);
+
+                    dvui.label(@src(), "{any}", .{cp}, .{});
+                }
+
+                if (info.minPINLength) |len| {
+                    var hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .padding = .{ .x = 10 } });
+                    defer hbox.deinit();
+
+                    dvui.label(@src(), "Minimum PIN length", .{}, .{});
+
+                    left_alignment2.spacer(@src(), 0);
+
+                    dvui.label(@src(), "{d}", .{len}, .{});
+                }
+
+                {
+                    var hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .padding = .{ .x = 10 } });
+                    defer hbox.deinit();
+
+                    if (info.forcePINChange != null and info.forcePINChange.?) {
+                        dvui.label(@src(), "forcePINChange", .{}, .{});
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn drawDeviceSelectorWidget(
+    win: *dvui.Window,
+    uniqueId: dvui.Id,
+    allocator: std.mem.Allocator,
+) !void {
     const local = struct {
         var transport_labels: ?std.ArrayList([]const u8) = null;
         var transports: ?client.Transports = null;
         var loading_transports: bool = false;
         var choice: ?usize = null;
-        var selected_device: ?*client.Transports.Transport = null;
-        var info: ?client.Info = null;
-
-        pub fn closeDevice() void {
-            if (selected_device) |dev| {
-                std.log.info("closing old device", .{});
-                dev.close();
-                selected_device = null;
-            }
-
-            if (info != null) {
-                info.?.deinit(gpa);
-                info = null;
-            }
-        }
     };
 
     // Load list of available devices
@@ -144,7 +243,7 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
                 &local.transport_labels,
                 &local.loading_transports,
                 &local.choice,
-                gpa,
+                allocator,
             },
         ) catch |err| {
             dvui.log.err(
@@ -156,18 +255,6 @@ pub fn loginWidget(uniqueId: dvui.Id) !void {
         bg_thread.detach();
     }
 
-    var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
-    defer vbox.deinit();
-
-    var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
-    defer scroll.deinit();
-
-    try drawDeviceSelectorWidget(&local);
-}
-
-fn drawDeviceSelectorWidget(
-    local: anytype,
-) !void {
     var left_alignment = dvui.Alignment.init(@src(), 0);
     defer left_alignment.deinit();
 
@@ -204,14 +291,16 @@ fn drawDeviceSelectorWidget(
                 if (local.choice) |i| {
                     std.log.info("selected device [{d}] '{s}'", .{ i, local.transport_labels.?.items[i] });
 
-                    local.closeDevice();
+                    closeDevice(win, uniqueId, allocator);
 
                     const bg_thread = std.Thread.spawn(
                         .{},
                         open_device,
                         .{
+                            win,
+                            uniqueId,
                             local,
-                            gpa,
+                            allocator,
                         },
                     ) catch |err| {
                         dvui.log.err(
@@ -223,7 +312,7 @@ fn drawDeviceSelectorWidget(
                     bg_thread.detach();
                 } else {
                     std.log.info("deselected device", .{});
-                    local.closeDevice();
+                    closeDevice(win, uniqueId, allocator);
                 }
             }
         } else {
@@ -264,7 +353,7 @@ fn drawDeviceSelectorWidget(
                         &local.transport_labels,
                         &local.loading_transports,
                         &local.choice,
-                        gpa,
+                        allocator,
                     },
                 ) catch |err| {
                     dvui.log.err(
@@ -286,7 +375,37 @@ fn drawDeviceSelectorWidget(
     }
 }
 
+pub fn closeDevice(
+    win: *dvui.Window,
+    uniqueId: dvui.Id,
+    allocator: std.mem.Allocator,
+) void {
+    if (dvui.dataGet(
+        win,
+        uniqueId,
+        "device",
+        *client.Transports.Transport,
+    )) |t| {
+        std.log.info("closing old device", .{});
+        t.close();
+    }
+    dvui.dataRemove(win, uniqueId, "device");
+
+    if (dvui.dataGet(
+        win,
+        uniqueId,
+        "deviceInfo",
+        client.Info,
+    )) |info| {
+        std.log.info("deallocating device info", .{});
+        info.deinit(allocator);
+    }
+    dvui.dataRemove(win, uniqueId, "deviceInfo");
+}
+
 fn open_device(
+    win: *dvui.Window,
+    uniqueId: dvui.Id,
     local: anytype,
     a: std.mem.Allocator,
 ) void {
@@ -294,25 +413,25 @@ fn open_device(
 
     std.log.info("opening device", .{});
 
-    local.selected_device = &local.transports.?.devices[local.choice.?];
+    var device = &local.transports.?.devices[local.choice.?];
 
-    local.selected_device.?.open() catch |e| {
+    device.open() catch |e| {
         std.log.err("failed to open selected device ({any})", .{e});
-        local.closeDevice();
+        closeDevice(win, uniqueId, a);
         local.choice = null;
         return;
     };
 
-    var info_state_ = client.getInfo(local.selected_device.?) catch |e| {
+    var info_state_ = client.getInfo(device) catch |e| {
         std.log.err("failed to obtain device information ({any})", .{e});
-        local.closeDevice();
+        closeDevice(win, uniqueId, a);
         local.choice = null;
         return;
     };
 
     var info_state = info_state_.await(a) catch |e| {
         std.log.err("failed to obtain device information ({any})", .{e});
-        local.closeDevice();
+        closeDevice(win, uniqueId, a);
         local.choice = null;
         return;
     };
@@ -320,12 +439,15 @@ fn open_device(
 
     std.log.info("[cbor]: {x}", .{info_state.fulfilled});
 
-    local.info = info_state.deserializeCbor(client.Info, a) catch |e| {
+    const info = info_state.deserializeCbor(client.Info, a) catch |e| {
         std.log.err("failed to deserialize info CBOR data ({any})", .{e});
-        local.closeDevice();
+        closeDevice(win, uniqueId, a);
         local.choice = null;
         return;
     };
+
+    dvui.dataSet(win, uniqueId, "device", device);
+    dvui.dataSet(win, uniqueId, "deviceInfo", info);
 }
 
 fn list_available_devices(
