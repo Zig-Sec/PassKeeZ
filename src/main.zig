@@ -28,8 +28,6 @@ pub const std_options: std.Options = .{
     .log_level = .warn,
 };
 
-var exit: bool = false;
-
 pub fn main(init: std.process.Init) !void {
     defer _ = gpa.detectLeaks();
 
@@ -136,8 +134,6 @@ pub fn main(init: std.process.Init) !void {
 
     // This is the main loop
     while (true) {
-        if (exit) break;
-
         State.get().update(init.io);
 
         // We read in usb packets with a size of 64 bytes.
@@ -328,7 +324,6 @@ pub fn my_up(
         },
     }) catch |e| {
         std.log.err("up: unable to create up dialog ({any})", .{e});
-        exit = true;
         return UpResult.Denied;
     };
     defer {

@@ -9,14 +9,12 @@
             .hash = "uuid-0.5.0-oOieIQx-AABtc9U3ihv_bf9pZAYoKp4UMsNFHBr-cn-w",
         },
         .kdbx = .{
-            //.url = "https://codeberg.org/r4gus/kdbx/archive/0.5.0.tar.gz",
-            //.hash = "kdbx-0.5.0-eJXZBDioEwBqe3g9JcRwB9p9QTgHnpaKgj73OJ4tNqHu",
-            .path = "../kdbx",
+            .url = "https://codeberg.org/r4gus/kdbx/archive/0.5.0.tar.gz",
+            .hash = "kdbx-0.5.0-eJXZBEioEwBm8vW0-QYTGr29XL5GmMv9XHtxvRvord4L",
         },
         .keylib = .{
-            //.url = "https://codeberg.org/r4gus/keylib/archive/0.9.1.tar.gz",
-            //.hash = "keylib-0.9.1-mbYjk9IgCwAJbAejXX7o3wuXNHxDjFN9HtL4L5rUOQSt",
-            .path = "../keylib",
+            .url = "git+https://codeberg.org/r4gus/keylib#a0a80a79f83582df9bc2bd50429cf8b065042da2",
+            .hash = "keylib-0.10.0-mbYjk9s2CwBvZAtqjCwjk-eoyP5QX3bGu2trmgIX9CXn",
         },
         .dvui = .{
             .url = "git+https://github.com/david-vanderson/dvui#5f3f394d78382c434d7c5b152ce476833db542de",
