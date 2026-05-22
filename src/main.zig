@@ -13,8 +13,9 @@ const Meta = keylib.ctap.authenticator.Meta;
 
 var gpa = std.heap.DebugAllocator(.{}){};
 const allocator = gpa.allocator();
+var io_: std.Io = undefined; // initialized right after startup
 
-const State = @import("state.zig");
+const State = @import("State.zig");
 
 var initialized = false;
 
@@ -27,7 +28,13 @@ pub const std_options: std.Options = .{
     .log_level = .warn,
 };
 
+var exit: bool = false;
+
 pub fn main(init: std.process.Init) !void {
+    defer _ = gpa.detectLeaks();
+
+    io_ = init.io;
+
     // We need the path to the home folder.
     // TODO: add command line argument as backup
     const home = init.minimal.environ.getAlloc(allocator, "HOME") catch |e| {
@@ -40,7 +47,7 @@ pub fn main(init: std.process.Init) !void {
         std.log.err("Unable to initialize application ({any})", .{e});
         return std.c.exit(1);
     };
-    defer State.deinitState(allocator);
+    defer State.deinit(allocator);
 
     // The Auth struct is the most important part of your authenticator. It defines
     // its capabilities and behavior.
@@ -129,7 +136,9 @@ pub fn main(init: std.process.Init) !void {
 
     // This is the main loop
     while (true) {
-        State.update(init.io);
+        if (exit) break;
+
+        State.get().update(init.io);
 
         // We read in usb packets with a size of 64 bytes.
         var buffer: [64]u8 = .{0} ** 64;
@@ -147,7 +156,7 @@ pub fn main(init: std.process.Init) !void {
                         // We have to handle this here as we don't need to
                         // decrypt the database for this
                         if (res._data[0] == 0x0b) { // authenticator selection
-                            res._data[0] = @intFromEnum(authenticatorSelection(init.io));
+                            res._data[0] = @intFromEnum(authenticatorSelection(State.get(), init.io));
                             res.len = 1;
                             skip = true;
                         }
@@ -156,7 +165,7 @@ pub fn main(init: std.process.Init) !void {
                 }
 
                 if (!skip) {
-                    State.authenticate(allocator, init.io) catch |e| {
+                    State.get().authenticate(allocator, init.io) catch |e| {
                         std.log.err("authentication failed ({any})", .{e});
                         res._data[0] = 0x3f;
                         res.len = 1;
@@ -221,15 +230,15 @@ const Data = struct {
 // /////////////////////////////////////////
 const i18n = @import("i18n.zig");
 
-pub fn authenticatorSelection(io: std.Io) keylib.ctap.StatusCodes {
+pub fn authenticatorSelection(state_: *State, io: std.Io) keylib.ctap.StatusCodes {
     const r = std.process.run(allocator, io, .{
         .argv = &.{
             "zigenity",
             "--question",
             "--window-icon=/usr/share/passkeez/passkeez.png",
             "--icon=/usr/share/passkeez/passkeez-question.png",
-            i18n.get(State.conf.lang).auth_select,
-            i18n.get(State.conf.lang).auth_select_title,
+            i18n.get(state_.conf.lang).auth_select,
+            i18n.get(state_.conf.lang).auth_select_title,
             "--timeout=15",
         },
     }) catch |e| {
@@ -281,7 +290,7 @@ pub fn my_uv(
     _ = rp;
     _ = pinHash;
 
-    return State.uv_result;
+    return State.get().uv_result;
 }
 
 pub fn my_up(
@@ -295,33 +304,31 @@ pub fn my_up(
     _ = info;
     _ = user;
 
-    var io_impl = std.Io.Threaded.init_single_threaded;
-    const io = io_impl.io();
-
-    std.log.info("up: {any}", .{State.up_result});
-    if (State.up_result) |r| return r;
+    std.log.info("up: {any}", .{State.get().up_result});
+    if (State.get().up_result) |r| return r;
 
     const text = std.fmt.allocPrint(allocator, "{s} {s}", .{
-        i18n.get(State.conf.lang).user_presence,
-        if (rp) |rp_| rp_.id.get() else i18n.get(State.conf.lang).user_presence_fallback,
+        i18n.get(State.get().conf.lang).user_presence,
+        if (rp) |rp_| rp_.id.get() else i18n.get(State.get().conf.lang).user_presence_fallback,
     }) catch |e| {
         std.log.err("up: unable to allocate memory for text ({any})", .{e});
         return UpResult.Denied;
     };
     defer allocator.free(text);
 
-    const r = std.process.run(allocator, io, .{
+    const r = std.process.run(allocator, io_, .{
         .argv = &.{
             "zigenity",
             "--question",
             "--window-icon=/usr/share/passkeez/passkeez.png",
             "--icon=/usr/share/passkeez/passkeez-question.png",
             text,
-            i18n.get(State.conf.lang).user_presence_title,
+            i18n.get(State.get().conf.lang).user_presence_title,
             "--timeout=30",
         },
     }) catch |e| {
         std.log.err("up: unable to create up dialog ({any})", .{e});
+        exit = true;
         return UpResult.Denied;
     };
     defer {
@@ -342,9 +349,6 @@ pub fn my_read_first(
     rp: ?dt.ABS128T,
     hash: ?[32]u8,
 ) CallbackError!Credential {
-    var io_impl = std.Io.Threaded.init_single_threaded;
-    const io = io_impl.io();
-
     std.log.info("my_first_read:\n  id:   {s}\n  rpId: {s}", .{
         if (id) |uid| uid.get() else "n.a.",
         if (rp) |rpid| rpid.get() else "n.a.",
@@ -354,9 +358,9 @@ pub fn my_read_first(
         fetch_index = 0;
         fetch_rp = rp;
         fetch_hash = hash;
-        fetch_ts = std.Io.Timestamp.now(io, .real).toMilliseconds();
+        fetch_ts = std.Io.Timestamp.now(io_, .real).toMilliseconds();
 
-        return State.database.?.getCredential(&State.database.?, if (fetch_rp) |frp| frp.get() else null, hash, &fetch_index.?) catch |e| {
+        return State.get().database.?.getCredential(&State.get().database.?, if (fetch_rp) |frp| frp.get() else null, hash, &fetch_index.?) catch |e| {
             std.log.info("No entry found: {any}", .{e});
             fetch_index = null;
             fetch_rp = null;
@@ -368,9 +372,9 @@ pub fn my_read_first(
         fetch_index = 0;
         fetch_rp = null;
         fetch_hash = null;
-        fetch_ts = std.Io.Timestamp.now(io, .real).toMilliseconds();
+        fetch_ts = std.Io.Timestamp.now(io_, .real).toMilliseconds();
 
-        return State.database.?.getCredential(&State.database.?, null, null, &fetch_index.?) catch |e| {
+        return State.get().database.?.getCredential(&State.get().database.?, null, null, &fetch_index.?) catch |e| {
             std.log.info("No entry found: {any}", .{e});
             fetch_index = null;
             fetch_rp = null;
@@ -394,7 +398,7 @@ pub fn my_read_next() CallbackError!Credential {
         return error.Other;
     }
 
-    return State.database.?.getCredential(&State.database.?, if (fetch_rp) |rp| rp.get() else null, fetch_hash, &fetch_index.?) catch |e| {
+    return State.get().database.?.getCredential(&State.get().database.?, if (fetch_rp) |rp| rp.get() else null, fetch_hash, &fetch_index.?) catch |e| {
         std.log.info("No entry found: {any}", .{e});
         fetch_index = null;
         fetch_rp = null;
@@ -407,7 +411,7 @@ pub fn my_read_next() CallbackError!Credential {
 pub fn my_write(
     data: Credential,
 ) CallbackError!void {
-    State.database.?.setCredential(&State.database.?, data) catch {
+    State.get().database.?.setCredential(&State.get().database.?, data) catch {
         return error.Other;
     };
 }

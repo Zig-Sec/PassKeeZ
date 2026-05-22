@@ -4,7 +4,7 @@ const keylib = @import("keylib");
 const Request = @import("cred_mgmt/Request.zig");
 const Response = @import("cred_mgmt/Response.zig");
 
-const State = @import("state.zig");
+const State = @import("State.zig");
 
 var gpa = std.heap.DebugAllocator(.{}){};
 
@@ -351,7 +351,7 @@ pub fn deleteCredential(auth: *keylib.ctap.authenticator.Auth, req: *const Reque
         return .{};
     }
 
-    State.database.?.deleteCredential(&State.database.?, id[0..36].*) catch {
+    State.get().database.?.deleteCredential(&State.get().database.?, id[0..36].*) catch {
         status.* = .ctap2_err_no_credentials;
         return .{};
     };

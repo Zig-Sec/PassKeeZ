@@ -19,7 +19,7 @@ pub fn load(a: std.mem.Allocator, io: std.Io, home: []const u8) !@This() {
     var buffer: [1024]u8 = undefined;
     var reader = file.reader(io, &buffer);
 
-    const mem = try reader.interface.readAlloc(a, 50_000_000);
+    const mem = try reader.interface.readAlloc(a, try file.length(io));
     defer a.free(mem);
 
     return try std.json.parseFromSliceLeaky(

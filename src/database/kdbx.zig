@@ -5,9 +5,9 @@ const kdbx = @import("kdbx");
 const keylib = @import("keylib");
 const Credential = keylib.ctap.authenticator.Credential;
 const i18n = @import("../i18n.zig");
-const State = @import("../state.zig");
 const Uuid = @import("uuid");
 const cbor = @import("zbor");
+const State = @import("../State.zig");
 
 pub fn Database(
     path: []const u8,
@@ -71,6 +71,7 @@ fn deinit(self: *const TDatabase) void {
     if (self.db) |db| {
         var db_ = @as(*kdbx.Database, @ptrCast(@alignCast(db)));
         db_.deinit();
+        self.allocator.destroy(db_);
     }
     self.allocator.free(self.path);
     self.allocator.free(self.pw);
@@ -233,8 +234,8 @@ pub fn createDialog(allocator: std.mem.Allocator, io: std.Io, path: []const u8, 
             "--question",
             "--window-icon=/usr/share/passkeez/passkeez.png",
             "--icon=/usr/share/passkeez/passkeez-question.png",
-            i18n.get(State.conf.lang).no_database_title,
-            i18n.get(State.conf.lang).no_database,
+            i18n.get(State.get().conf.lang).no_database_title,
+            i18n.get(State.get().conf.lang).no_database,
         },
     }) catch |e| {
         std.log.err("unable to execute zigenity ({any})", .{e});
@@ -257,9 +258,9 @@ pub fn createDialog(allocator: std.mem.Allocator, io: std.Io, path: []const u8, 
                 "zigenity",
                 "--password",
                 "--window-icon=/usr/share/passkeez/passkeez.png",
-                i18n.get(State.conf.lang).new_database_title,
-                i18n.get(State.conf.lang).new_database,
-                i18n.get(State.conf.lang).new_database_ok,
+                i18n.get(State.get().conf.lang).new_database_title,
+                i18n.get(State.get().conf.lang).new_database,
+                i18n.get(State.get().conf.lang).new_database_ok,
                 "--cancel-label=Cancel",
             },
         }) catch |e| {
@@ -355,8 +356,8 @@ pub fn createDialog(allocator: std.mem.Allocator, io: std.Io, path: []const u8, 
                         "--question",
                         "--window-icon=/usr/share/passkeez/passkeez.png",
                         "--icon=/usr/share/passkeez/passkeez-ok.png",
-                        i18n.get(State.conf.lang).database_created,
-                        i18n.get(State.conf.lang).database_created_title,
+                        i18n.get(State.get().conf.lang).database_created,
+                        i18n.get(State.get().conf.lang).database_created_title,
                         "--timeout=15",
                         "--switch-cancel",
                         "--ok-label=Ok",
