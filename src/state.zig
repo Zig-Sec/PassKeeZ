@@ -8,14 +8,12 @@ const i18n = @import("i18n.zig");
 const misc = @import("database/misc.zig");
 
 pub var conf: Config = undefined;
+pub var home: []const u8 = undefined;
 
 /// The open database
 ///
 /// This variable is accessed by the main and the authenticator
 /// thread if the application is in `main` state.
-///
-/// TODO: currently the main thread uses the database only for reading
-///       but we probably need a lock in the future.
 pub var database: ?Database = null;
 
 pub var uv_result = UvResult.Denied;
@@ -25,16 +23,22 @@ var ts: ?i64 = null;
 const tout1: i64 = 10; // seconds
 const tout2: i64 = 60; // seconds
 
-pub fn init(a: std.mem.Allocator) !void {
-    conf = Config.load(a) catch |e| {
+pub fn init(a: std.mem.Allocator, io: std.Io, home_: []const u8) !void {
+    conf = Config.load(a, io, home_) catch |e| {
         std.log.err("unable to load configuration file ({any})", .{e});
         return e;
     };
+    home = try a.dupe(u8, home_);
 }
 
-pub fn update() void {
+pub fn deinitState(a: std.mem.Allocator) void {
+    conf.deinit(a);
+    a.free(home);
+}
+
+pub fn update(io: std.Io) void {
     if (ts) |ts_| {
-        const now = std.time.timestamp();
+        const now = std.Io.Timestamp.now(io, .real).toSeconds();
         if (now - ts_ > tout2) {
             deinit();
         } else if (now - ts_ > tout1) {
@@ -45,18 +49,18 @@ pub fn update() void {
     }
 }
 
-pub fn authenticate(a: std.mem.Allocator) !void {
+pub fn authenticate(a: std.mem.Allocator, io: std.Io) !void {
     if (ts != null) return; // nothing to do
 
     var i: usize = 3;
 
-    const f = misc.openFile(conf.db_path) catch |e| blk: {
+    const f = misc.openFile(io, conf.db_path, home) catch |e| blk: {
         if (e != error.WouldBlock) {
             if (std.mem.containsAtLeast(u8, conf.db_path, 1, ".ccdb")) {
                 std.log.err("Databases of the format '.ccdb' are deprecated. Please check your config or use an earlier version of PassKeeZ.", .{});
                 return error.DeprecatedDatabaseFormat;
             } else if (std.mem.containsAtLeast(u8, conf.db_path, 1, ".kdbx")) {
-                break :blk Database.kdbx.createDialog(a, conf.db_path) catch |e_| {
+                break :blk Database.kdbx.createDialog(a, io, conf.db_path, home) catch |e_| {
                     std.log.err("unable to create database '{s}' ({any})", .{ conf.db_path, e });
                     return e_;
                 };
@@ -68,11 +72,10 @@ pub fn authenticate(a: std.mem.Allocator) !void {
             return error.WouldBlock;
         }
     };
-    f.close();
+    f.close(io);
 
     outer: while (i > 0) : (i -= 1) {
-        var password = std.process.Child.run(.{
-            .allocator = a,
+        var password = std.process.run(a, io, .{
             .argv = &.{
                 "zigenity",
                 "--password",
@@ -94,12 +97,11 @@ pub fn authenticate(a: std.mem.Allocator) !void {
         }
         //std.debug.print("{any}", .{password});
 
-        switch (password.term.Exited) {
+        switch (password.term.exited) {
             0 => {
                 var db = if (std.mem.containsAtLeast(u8, conf.db_path, 1, ".ccdb")) {
                     std.log.err("unsupported database {s}", .{conf.db_path});
-                    const r = std.process.Child.run(.{
-                        .allocator = a,
+                    const r = std.process.run(a, io, .{
                         .argv = &.{
                             "zigenity",
                             "--question",
@@ -123,16 +125,17 @@ pub fn authenticate(a: std.mem.Allocator) !void {
                 } else if (std.mem.containsAtLeast(u8, conf.db_path, 1, ".kdbx")) blk: {
                     break :blk Database.kdbx.Database(
                         conf.db_path,
+                        home,
                         password.stdout[0 .. password.stdout.len - 1],
                         a,
+                        io,
                     ) catch {
                         std.log.err("unable to instantiate Database", .{});
                         continue :outer;
                     };
                 } else {
                     std.log.err("unsupported database {s}", .{conf.db_path});
-                    const r = std.process.Child.run(.{
-                        .allocator = a,
+                    const r = std.process.run(a, io, .{
                         .argv = &.{
                             "zigenity",
                             "--question",
@@ -157,8 +160,7 @@ pub fn authenticate(a: std.mem.Allocator) !void {
 
                 db.init(&db) catch |e| {
                     std.log.err("unable to decrypt database {s} ({any})", .{ conf.db_path, e });
-                    const r = std.process.Child.run(.{
-                        .allocator = a,
+                    const r = std.process.run(a, io, .{
                         .argv = &.{
                             "zigenity",
                             "--question",
@@ -181,7 +183,7 @@ pub fn authenticate(a: std.mem.Allocator) !void {
                     continue :outer;
                 };
 
-                ts = std.time.timestamp();
+                ts = std.Io.Timestamp.now(io, .real).toSeconds();
                 uv_result = UvResult.AcceptedWithUp;
                 up_result = UpResult.Accepted;
                 database = db;
@@ -192,8 +194,7 @@ pub fn authenticate(a: std.mem.Allocator) !void {
             },
         }
     } else {
-        const r = std.process.Child.run(.{
-            .allocator = a,
+        const r = std.process.run(a, io, .{
             .argv = &.{
                 "zigenity",
                 "--question",

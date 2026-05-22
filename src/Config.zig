@@ -6,17 +6,20 @@ const config_name = "config.json";
 db_path: []const u8 = "",
 lang: []const u8 = "english",
 
-pub fn load(a: std.mem.Allocator) !@This() {
-    var file = openOrCreate(a) catch |e| {
+pub fn load(a: std.mem.Allocator, io: std.Io, home: []const u8) !@This() {
+    var file = openOrCreate(a, io, home) catch |e| {
         std.log.err(
             "unable to open or create '~/{s}/{s}' ({any})",
             .{ config_dir_name, config_name, e },
         );
         return error.NotFound;
     };
-    defer file.close();
+    defer file.close(io);
 
-    const mem = try file.readToEndAlloc(a, 50_000_000);
+    var buffer: [1024]u8 = undefined;
+    var reader = file.reader(io, &buffer);
+
+    const mem = try reader.interface.readAlloc(a, 50_000_000);
     defer a.free(mem);
 
     return try std.json.parseFromSliceLeaky(
@@ -27,38 +30,34 @@ pub fn load(a: std.mem.Allocator) !@This() {
     );
 }
 
-pub fn getHomeDir(a: std.mem.Allocator) !std.fs.Dir {
-    const home = try std.process.getEnvVarOwned(a, "HOME");
-    defer a.free(home);
+pub fn openOrCreate(a: std.mem.Allocator, io: std.Io, home_: []const u8) !std.Io.File {
+    _ = a;
 
-    return std.fs.openDirAbsolute(home, .{});
-}
-
-pub fn openOrCreate(a: std.mem.Allocator) !std.fs.File {
     var created = false;
 
-    var home = try getHomeDir(a);
-    defer home.close();
+    var home = try std.Io.Dir.openDirAbsolute(io, home_, .{});
+    defer home.close(io);
 
-    var conf_dir = try home.makeOpenPath(config_dir_name, .{});
-    defer conf_dir.close();
+    var conf_dir = try home.createDirPathOpen(io, config_dir_name, .{});
+    defer conf_dir.close(io);
 
     var f = conf_dir.openFile(
+        io,
         config_name,
         .{ .mode = .read_write },
     ) catch blk: {
         const f = try conf_dir.createFile(
+            io,
             config_name,
             .{ .read = true },
         );
         created = true;
         break :blk f;
     };
-    errdefer f.close();
+    errdefer f.close(io);
 
     if (created) {
-        var writer = f.writer(&.{});
-        try writer.interface.flush();
+        var writer = f.writer(io, &.{});
 
         const x = @This(){};
         try std.json.Stringify.value(
@@ -66,8 +65,9 @@ pub fn openOrCreate(a: std.mem.Allocator) !std.fs.File {
             .{ .whitespace = .indent_2 },
             &writer.interface,
         );
+        try writer.interface.flush();
 
-        try f.seekTo(0);
+        try writer.seekTo(0);
     }
 
     return f;

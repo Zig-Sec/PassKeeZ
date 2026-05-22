@@ -25,15 +25,17 @@ pub const Error = error{
 };
 
 path: []const u8,
+home: []const u8, // TODO: don't know if this is the right place
 pw: []const u8,
 db: ?*anyopaque = null,
 allocator: std.mem.Allocator,
+io: std.Io,
 
 init: *const fn (*Self) Error!void,
 
 deinit: *const fn (*const Self) void,
 
-save: *const fn (*const Self, std.mem.Allocator) Error!void,
+save: *const fn (*const Self) Error!void,
 
 getCredential: *const fn (
     *const Self,

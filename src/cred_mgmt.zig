@@ -6,7 +6,7 @@ const Response = @import("cred_mgmt/Response.zig");
 
 const State = @import("state.zig");
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var gpa = std.heap.DebugAllocator(.{}){};
 
 pub fn authenticatorCredentialManagement(
     auth: *keylib.ctap.authenticator.Auth,
@@ -26,9 +26,10 @@ pub fn authenticatorCredentialManagement(
             rps = null;
         }
 
-        pub fn getRp() ?keylib.common.RelyingParty {
+        pub fn getRp(io: std.Io) ?keylib.common.RelyingParty {
             if (rps == null) return null;
-            if (std.time.milliTimestamp() - i > max) {
+
+            if (std.Io.Timestamp.now(io, .real).toMilliseconds() - i > max) {
                 deinitRps();
                 return null;
             }
@@ -55,7 +56,7 @@ pub fn authenticatorCredentialManagement(
     const res = switch (cmReq.subCommand) {
         .getCredsMetadata => getCredsMetadata(auth, &cmReq, &status),
         .enumerateRPsBegin => enumerateRPsBegin(auth, &cmReq, &status, S),
-        .enumerateRPsGetNextRP => enumerateRPsGetNextRP(&status, S),
+        .enumerateRPsGetNextRP => enumerateRPsGetNextRP(&status, auth.io, S),
         .enumerateCredentialsBegin => enumerateCredentialsBegin(auth, &cmReq, &status, S),
         .enumerateCredentialsGetNextCredential => enumerateCredentialsGetNextCredential(auth, &status),
         .deleteCredential => deleteCredential(auth, &cmReq, &status, S),
@@ -131,7 +132,7 @@ pub fn enumerateRPsBegin(auth: *keylib.ctap.authenticator.Auth, req: *const Requ
         };
     }
 
-    state.i = std.time.milliTimestamp();
+    state.i = std.Io.Timestamp.now(auth.io, .real).toMilliseconds();
 
     const rp = state.rps.?.swapRemove(0);
     var digest: [32]u8 = .{0} ** 32;
@@ -144,8 +145,8 @@ pub fn enumerateRPsBegin(auth: *keylib.ctap.authenticator.Auth, req: *const Requ
     };
 }
 
-pub fn enumerateRPsGetNextRP(status: *keylib.ctap.StatusCodes, state: anytype) Response {
-    const rp = state.getRp();
+pub fn enumerateRPsGetNextRP(status: *keylib.ctap.StatusCodes, io: std.Io, state: anytype) Response {
+    const rp = state.getRp(io);
 
     if (rp == null) {
         status.* = .ctap2_err_no_credentials;

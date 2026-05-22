@@ -93,9 +93,10 @@ pub fn AppInit(win: *dvui.Window) !void {
 
 // Run as app is shutting down before dvui.Window.deinit()
 pub fn AppDeinit() void {
-    closeDevice(window, uId, gpa);
+    closeDevice(gpa);
+    transport.reset(gpa);
 
-    //_ = gpa_instance.detectLeaks();
+    _ = gpa_instance.detectLeaks();
 }
 
 // Run each frame to do normal UI
@@ -709,7 +710,7 @@ fn drawDeviceSelectorWidget(
                 if (transport.choice) |i| {
                     std.log.info("selected device [{d}] '{s}'", .{ i, transport.transport_labels.?.items[i] });
 
-                    closeDevice(win, uniqueId, allocator);
+                    closeDevice(allocator);
 
                     const bg_thread = std.Thread.spawn(
                         .{},
@@ -730,7 +731,7 @@ fn drawDeviceSelectorWidget(
                     bg_thread.detach();
                 } else {
                     std.log.info("deselected device", .{});
-                    closeDevice(win, uniqueId, allocator);
+                    closeDevice(allocator);
                 }
             }
         } else {
@@ -761,7 +762,7 @@ fn drawDeviceSelectorWidget(
             },
         )) {
             if (!transport.loading_transports) blk: {
-                closeDevice(win, uniqueId, allocator);
+                closeDevice(allocator);
 
                 transport.loading_transports = true;
 
@@ -852,13 +853,8 @@ fn drawDeviceSelectorWidget(
 }
 
 pub fn closeDevice(
-    win: *dvui.Window,
-    uniqueId: dvui.Id,
     allocator: std.mem.Allocator,
 ) void {
-    _ = win;
-    _ = uniqueId;
-
     if (device) |dev| {
         std.log.info("closing old device", .{});
         dev.close();
@@ -877,6 +873,8 @@ fn reset(
     uniqueId: dvui.Id,
     a: std.mem.Allocator,
 ) void {
+    _ = uniqueId;
+
     if (device == null) {
         std.log.err("reset called despite 'device' being 'null'", .{});
         return;
@@ -901,7 +899,7 @@ fn reset(
                 }
             },
             .fulfilled => {
-                closeDevice(win, uniqueId, a);
+                closeDevice(a);
                 transport.reset(a);
 
                 dvui.toast(@src(), .{ .window = win, .message = "Device successfully reset" });
@@ -987,11 +985,13 @@ fn set_pin(
 
                 if (status_code != 0) {
                     std.log.err("failed to change pin ({d})", .{status_code});
+                    dvui.toast(@src(), .{ .window = win, .message = "Failed to change PIN" });
                     return;
                 }
             },
             else => {
                 std.log.err("failed to change pin", .{});
+                dvui.toast(@src(), .{ .window = win, .message = "Failed to change PIN" });
                 return;
             },
         }
@@ -1003,6 +1003,7 @@ fn set_pin(
             a,
         ) catch |e| {
             std.log.err("failed to set pin: {any}", .{e});
+            dvui.toast(@src(), .{ .window = win, .message = "Failed to set PIN" });
             return;
         };
         _ = spr;
@@ -1017,6 +1018,9 @@ fn get_device_info(
     local: anytype,
     a: std.mem.Allocator,
 ) void {
+    _ = win;
+    _ = uniqueId;
+
     if (device == null) {
         std.log.err("expected open device", .{});
         return;
@@ -1024,14 +1028,14 @@ fn get_device_info(
 
     var info_state_ = client.getInfo(device.?) catch |e| {
         std.log.err("failed to obtain device information ({any})", .{e});
-        closeDevice(win, uniqueId, a);
+        closeDevice(a);
         local.choice = null;
         return;
     };
 
     var info_state = info_state_.await(a) catch |e| {
         std.log.err("failed to obtain device information ({any})", .{e});
-        closeDevice(win, uniqueId, a);
+        closeDevice(a);
         local.choice = null;
         return;
     };
@@ -1041,7 +1045,7 @@ fn get_device_info(
 
     const info = info_state.deserializeCbor(client.Info, a) catch |e| {
         std.log.err("failed to deserialize info CBOR data ({any})", .{e});
-        closeDevice(win, uniqueId, a);
+        closeDevice(a);
         local.choice = null;
         return;
     };
@@ -1055,6 +1059,9 @@ fn open_device(
     local: anytype,
     a: std.mem.Allocator,
 ) void {
+    _ = win;
+    _ = uniqueId;
+
     if (local.choice == null) return;
 
     std.log.info("opening device", .{});
@@ -1063,7 +1070,7 @@ fn open_device(
 
     device_.open() catch |e| {
         std.log.err("failed to open selected device ({any})", .{e});
-        closeDevice(win, uniqueId, a);
+        closeDevice(a);
         local.choice = null;
         return;
     };
@@ -1172,7 +1179,9 @@ fn list_available_devices(
     if (transports.* != null) {
         std.log.info("deallocating old device list", .{});
         transports.*.?.deinit();
+    }
 
+    if (transport_labels.* != null) {
         for (transport_labels.*.?.items) |item| a.free(item);
         transport_labels.*.?.deinit(a);
     }

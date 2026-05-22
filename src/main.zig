@@ -11,7 +11,7 @@ const Credential = keylib.ctap.authenticator.Credential;
 const CallbackError = keylib.ctap.authenticator.callbacks.CallbackError;
 const Meta = keylib.ctap.authenticator.Meta;
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var gpa = std.heap.DebugAllocator(.{}){};
 const allocator = gpa.allocator();
 
 const State = @import("state.zig");
@@ -27,11 +27,20 @@ pub const std_options: std.Options = .{
     .log_level = .warn,
 };
 
-pub fn main() !void {
-    State.init(allocator) catch |e| {
+pub fn main(init: std.process.Init) !void {
+    // We need the path to the home folder.
+    // TODO: add command line argument as backup
+    const home = init.minimal.environ.getAlloc(allocator, "HOME") catch |e| {
+        std.log.err("missing \"HOME\" environment variable ({any})", .{e});
+        return;
+    };
+    defer allocator.free(home);
+
+    State.init(allocator, init.io, home) catch |e| {
         std.log.err("Unable to initialize application ({any})", .{e});
         return std.c.exit(1);
     };
+    defer State.deinitState(allocator);
 
     // The Auth struct is the most important part of your authenticator. It defines
     // its capabilities and behavior.
@@ -92,29 +101,27 @@ pub fn main() !void {
         },
         // Here we initialize the pinUvAuth token data structure wich handles the generation
         // and management of pinUvAuthTokens.
-        .token = keylib.ctap.pinuv.PinUvAuth.v2(std.crypto.random),
+        .token = keylib.ctap.pinuv.PinUvAuth.v2(init.io),
         // Here we set the supported algorithm. You can also implement your
         // own and add them here.
         .algorithms = &.{
             keylib.ctap.crypto.algorithms.Es256,
         },
-        // A function to get the epoch time as i64.
-        .milliTimestamp = std.time.milliTimestamp,
-        // A cryptographically secure random number generator
-        .random = std.crypto.random,
+        .io = init.io,
         // If you don't want to increment the sign counts
         // of credentials (e.g. because you sync them between devices)
         // set this to true.
         .constSignCount = true,
+        .general_backup_eligibility = true,
     };
 
     // Here we instantiate a CTAPHID handler.
-    var ctaphid = keylib.ctap.transports.ctaphid.authenticator.CtapHid.init(allocator, std.crypto.random);
+    var ctaphid = keylib.ctap.transports.ctaphid.authenticator.CtapHid.init(allocator, init.io);
     defer ctaphid.deinit();
 
     // We use the uhid module on linux to simulate a USB device. If you use
     // tinyusb or something similar you have to adapt the code.
-    var u = uhid.Uhid.open() catch |e| {
+    var u = uhid.Uhid.open(init.io, "PassKeeZ authenticator") catch |e| {
         std.log.err("unable to open uhid device ({any})", .{e});
         return e;
     };
@@ -122,7 +129,7 @@ pub fn main() !void {
 
     // This is the main loop
     while (true) {
-        State.update();
+        State.update(init.io);
 
         // We read in usb packets with a size of 64 bytes.
         var buffer: [64]u8 = .{0} ** 64;
@@ -140,7 +147,7 @@ pub fn main() !void {
                         // We have to handle this here as we don't need to
                         // decrypt the database for this
                         if (res._data[0] == 0x0b) { // authenticator selection
-                            res._data[0] = @intFromEnum(authenticatorSelection());
+                            res._data[0] = @intFromEnum(authenticatorSelection(init.io));
                             res.len = 1;
                             skip = true;
                         }
@@ -149,7 +156,7 @@ pub fn main() !void {
                 }
 
                 if (!skip) {
-                    State.authenticate(allocator) catch |e| {
+                    State.authenticate(allocator, init.io) catch |e| {
                         std.log.err("authentication failed ({any})", .{e});
                         res._data[0] = 0x3f;
                         res.len = 1;
@@ -186,7 +193,8 @@ pub fn main() !void {
                 }
             }
         }
-        std.posix.nanosleep(0, 10000000);
+
+        init.io.sleep(std.Io.Duration.fromMilliseconds(25), .real) catch {};
     }
 }
 
@@ -213,9 +221,8 @@ const Data = struct {
 // /////////////////////////////////////////
 const i18n = @import("i18n.zig");
 
-pub fn authenticatorSelection() keylib.ctap.StatusCodes {
-    const r = std.process.Child.run(.{
-        .allocator = allocator,
+pub fn authenticatorSelection(io: std.Io) keylib.ctap.StatusCodes {
+    const r = std.process.run(allocator, io, .{
         .argv = &.{
             "zigenity",
             "--question",
@@ -234,7 +241,7 @@ pub fn authenticatorSelection() keylib.ctap.StatusCodes {
         allocator.free(r.stderr);
     }
 
-    switch (r.term.Exited) {
+    switch (r.term.exited) {
         0 => return .ctap1_err_success,
         5 => return .ctap2_err_user_action_timeout,
         else => return .ctap2_err_operation_denied,
@@ -288,6 +295,9 @@ pub fn my_up(
     _ = info;
     _ = user;
 
+    var io_impl = std.Io.Threaded.init_single_threaded;
+    const io = io_impl.io();
+
     std.log.info("up: {any}", .{State.up_result});
     if (State.up_result) |r| return r;
 
@@ -300,8 +310,7 @@ pub fn my_up(
     };
     defer allocator.free(text);
 
-    const r = std.process.Child.run(.{
-        .allocator = allocator,
+    const r = std.process.run(allocator, io, .{
         .argv = &.{
             "zigenity",
             "--question",
@@ -320,8 +329,8 @@ pub fn my_up(
         allocator.free(r.stderr);
     }
 
-    std.log.info("up result: {d}", .{r.term.Exited});
-    switch (r.term.Exited) {
+    std.log.info("up result: {d}", .{r.term.exited});
+    switch (r.term.exited) {
         0 => return UpResult.Accepted,
         5 => return UpResult.Timeout,
         else => return UpResult.Denied,
@@ -333,6 +342,9 @@ pub fn my_read_first(
     rp: ?dt.ABS128T,
     hash: ?[32]u8,
 ) CallbackError!Credential {
+    var io_impl = std.Io.Threaded.init_single_threaded;
+    const io = io_impl.io();
+
     std.log.info("my_first_read:\n  id:   {s}\n  rpId: {s}", .{
         if (id) |uid| uid.get() else "n.a.",
         if (rp) |rpid| rpid.get() else "n.a.",
@@ -342,7 +354,7 @@ pub fn my_read_first(
         fetch_index = 0;
         fetch_rp = rp;
         fetch_hash = hash;
-        fetch_ts = std.time.milliTimestamp();
+        fetch_ts = std.Io.Timestamp.now(io, .real).toMilliseconds();
 
         return State.database.?.getCredential(&State.database.?, if (fetch_rp) |frp| frp.get() else null, hash, &fetch_index.?) catch |e| {
             std.log.info("No entry found: {any}", .{e});
@@ -356,7 +368,7 @@ pub fn my_read_first(
         fetch_index = 0;
         fetch_rp = null;
         fetch_hash = null;
-        fetch_ts = std.time.milliTimestamp();
+        fetch_ts = std.Io.Timestamp.now(io, .real).toMilliseconds();
 
         return State.database.?.getCredential(&State.database.?, null, null, &fetch_index.?) catch |e| {
             std.log.info("No entry found: {any}", .{e});

@@ -1,24 +1,26 @@
 .{
     .name = .passkeez,
-    .version = "0.6.3",
-    .minimum_zig_version = "0.15.1",
+    .version = "0.7.0",
+    .minimum_zig_version = "0.16.0",
     .fingerprint = 0xdd1692d15d21a6f6,
     .dependencies = .{
         .uuid = .{
-            .url = "https://codeberg.org/r4gus/uuid-zig/archive/0.4.0.tar.gz",
-            .hash = "uuid-0.4.0-oOieIR2AAAChAUVBY4ABjYI1XN0EbVALmiN0JIlggC3i",
+            .url = "https://codeberg.org/r4gus/uuid-zig/archive/0.5.0.tar.gz",
+            .hash = "uuid-0.5.0-oOieIQx-AABtc9U3ihv_bf9pZAYoKp4UMsNFHBr-cn-w",
         },
         .kdbx = .{
-            .url = "https://codeberg.org/r4gus/kdbx/archive/0.4.0.tar.gz",
-            .hash = "kdbx-0.3.0-eJXZBCGiEwA7A8gVK3rpmn6AfrNniGR0XnhGx3TYvVqf",
+            //.url = "https://codeberg.org/r4gus/kdbx/archive/0.5.0.tar.gz",
+            //.hash = "kdbx-0.5.0-eJXZBDioEwBqe3g9JcRwB9p9QTgHnpaKgj73OJ4tNqHu",
+            .path = "../kdbx",
         },
         .keylib = .{
-            .url = "https://codeberg.org/r4gus/keylib/archive/0.9.1.tar.gz",
-            .hash = "keylib-0.9.1-mbYjk9IgCwAJbAejXX7o3wuXNHxDjFN9HtL4L5rUOQSt",
+            //.url = "https://codeberg.org/r4gus/keylib/archive/0.9.1.tar.gz",
+            //.hash = "keylib-0.9.1-mbYjk9IgCwAJbAejXX7o3wuXNHxDjFN9HtL4L5rUOQSt",
+            .path = "../keylib",
         },
         .dvui = .{
-            .url = "git+https://github.com/david-vanderson/dvui#4e0261b061258c9c4752c3fe384ab4f5da56a7a7",
-            .hash = "dvui-0.4.0-dev-AQFJmS--3wANx5NhfSO0dzJ2ylKV5zLY89nKnK3KnJf7",
+            .url = "git+https://github.com/david-vanderson/dvui#5f3f394d78382c434d7c5b152ce476833db542de",
+            .hash = "dvui-0.5.0-dev-AQFJmVEc9gBhhgP3p8dN09veUHczWd-6-wo22tahQFdJ",
         },
     },
     .paths = .{

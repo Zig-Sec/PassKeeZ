@@ -11,13 +11,17 @@ const cbor = @import("zbor");
 
 pub fn Database(
     path: []const u8,
+    home: []const u8,
     pw: []const u8,
     allocator: std.mem.Allocator,
+    io: std.Io,
 ) TDatabase.Error!TDatabase {
     return TDatabase{
         .path = allocator.dupe(u8, path) catch return error.OutOfMemory,
+        .home = home,
         .pw = allocator.dupe(u8, pw) catch return error.OutOfMemory,
         .allocator = allocator,
+        .io = io,
         .init = init,
         .deinit = deinit,
         .save = save,
@@ -28,23 +32,21 @@ pub fn Database(
 }
 
 fn init(self: *TDatabase) TDatabase.Error!void {
-    var file = misc.openFile(self.path) catch |e| blk: {
+    var file = misc.openFile(self.io, self.path, self.home) catch |e| blk: {
         if (e == error.WouldBlock) {
             std.log.err("Cannot open database: ({any})", .{e});
             return error.WouldBlock;
         } else { // FileNotFound
-            break :blk createDialog(self.allocator, self.path) catch |e2| {
+            break :blk createDialog(self.allocator, self.io, self.path, self.home) catch |e2| {
                 std.log.err("Cannot open database: ({any})", .{e2});
                 return error.FileNotFound;
             };
         }
     };
-    defer file.close();
+    defer file.close(self.io);
 
-    const mem = file.readToEndAlloc(self.allocator, 50_000_000) catch return error.FileError;
-    defer self.allocator.free(mem);
-
-    var reader = std.Io.Reader.fixed(mem);
+    var buffer: [1024]u8 = undefined;
+    var reader = file.reader(self.io, &buffer);
 
     const db = try self.allocator.create(kdbx.Database);
     errdefer self.allocator.destroy(db);
@@ -55,8 +57,7 @@ fn init(self: *TDatabase) TDatabase.Error!void {
     };
     defer db_key.deinit();
 
-    db.* = kdbx.Database.open(&reader, .{
-        .allocator = self.allocator,
+    db.* = kdbx.Database.open(&reader.interface, self.allocator, self.io, .{
         .key = db_key,
     }) catch |e| {
         std.log.err("unable to decrypt database {any}", .{e});
@@ -75,10 +76,10 @@ fn deinit(self: *const TDatabase) void {
     self.allocator.free(self.pw);
 }
 
-fn save(self: *const TDatabase, a: std.mem.Allocator) TDatabase.Error!void {
+fn save(self: *const TDatabase) TDatabase.Error!void {
     var db = @as(*kdbx.Database, @ptrCast(@alignCast(self.db.?)));
 
-    var raw = std.Io.Writer.Allocating.init(a);
+    var raw = std.Io.Writer.Allocating.init(self.allocator);
     defer raw.deinit();
 
     const db_key = kdbx.DatabaseKey{
@@ -90,13 +91,20 @@ fn save(self: *const TDatabase, a: std.mem.Allocator) TDatabase.Error!void {
     db.save(
         &raw.writer,
         db_key,
-        a,
+        self.allocator,
+        self.io,
     ) catch |e| {
         std.log.err("Cannot to seal database: {any}", .{e});
         return error.DatabaseError;
     };
 
-    misc.writeFile(self.path, raw.written(), a) catch |e| {
+    misc.writeFile(
+        self.allocator,
+        self.io,
+        self.path,
+        raw.written(),
+        self.home,
+    ) catch |e| {
         std.log.err("Cannot to save database: {any}", .{e});
         return error.DatabaseError;
     };
@@ -115,7 +123,7 @@ fn deleteCredential(
     if (e1) |*e1_| e1_.deinit();
 
     // persist data
-    save(self, self.allocator) catch {
+    save(self) catch {
         return error.Other;
     };
 }
@@ -177,7 +185,7 @@ fn setCredential(
     };
 
     const e = if (grp.getEntryById(id)) |e| e else blk: {
-        const e = grp.createEntry() catch {
+        const e = grp.createEntry(self.io) catch {
             std.log.err("unable to create new entry", .{});
             return error.Other;
         };
@@ -203,6 +211,7 @@ fn setCredential(
     defer self.allocator.free(pem_key);
 
     e.setKeePassXCPasskeyValues(
+        self.io,
         data.rp.id.get(),
         if (data.user.name) |name| name.get() else "",
         data.user.id.get(),
@@ -210,16 +219,15 @@ fn setCredential(
     ) catch return TDatabase.Error.DatabaseError;
 
     // persist data
-    save(self, self.allocator) catch {
+    save(self) catch {
         return error.Other;
     };
 }
 
 // ----------------- Helper ----------------------
 
-pub fn createDialog(allocator: std.mem.Allocator, path: []const u8) !std.fs.File {
-    const r1 = std.process.Child.run(.{
-        .allocator = allocator,
+pub fn createDialog(allocator: std.mem.Allocator, io: std.Io, path: []const u8, home: []const u8) !std.Io.File {
+    const r1 = std.process.run(allocator, io, .{
         .argv = &.{
             "zigenity",
             "--question",
@@ -238,14 +246,13 @@ pub fn createDialog(allocator: std.mem.Allocator, path: []const u8) !std.fs.File
         allocator.free(r1.stderr);
     }
 
-    switch (r1.term.Exited) {
+    switch (r1.term.exited) {
         0 => {},
         else => return error.CreateDbRejected,
     }
 
     outer: while (true) {
-        var r2 = std.process.Child.run(.{
-            .allocator = allocator,
+        var r2 = std.process.run(allocator, io, .{
             .argv = &.{
                 "zigenity",
                 "--password",
@@ -264,14 +271,13 @@ pub fn createDialog(allocator: std.mem.Allocator, path: []const u8) !std.fs.File
             allocator.free(r2.stderr);
         }
 
-        switch (r2.term.Exited) {
+        switch (r2.term.exited) {
             0 => {
                 //std.debug.print("{s}", .{r2.stdout});
                 const pw1 = r2.stdout[0 .. r2.stdout.len - 1];
 
                 if (pw1.len < 8) {
-                    const r = std.process.Child.run(.{
-                        .allocator = allocator,
+                    const r = std.process.run(allocator, io, .{
                         .argv = &.{
                             "zigenity",
                             "--question",
@@ -294,23 +300,22 @@ pub fn createDialog(allocator: std.mem.Allocator, path: []const u8) !std.fs.File
                     continue :outer;
                 }
 
-                const f_db = misc.createFile(path) catch |e| {
+                const f_db = misc.createFile(io, path, home) catch |e| {
                     std.log.err("Cannot create new database file: {any}", .{e});
                     return error.FileError;
                 };
-                errdefer f_db.close();
+                errdefer f_db.close(io);
 
-                var database = kdbx.Database.new(.{
+                var database = kdbx.Database.new(allocator, io, .{
                     .generator = "PassKeeZ",
                     .name = "PassKeeZ Database",
-                    .allocator = allocator,
                 }) catch |e| {
                     std.log.err("Cannot create database: {any}", .{e});
                     return error.DatabaseError;
                 };
                 defer database.deinit();
 
-                const grp = kdbx.Group.new("Passkeys", allocator) catch |e| {
+                const grp = kdbx.Group.new("Passkeys", allocator, io) catch |e| {
                     std.log.err("Cannot create group: {any}", .{e});
                     return error.DatabaseError;
                 };
@@ -332,19 +337,19 @@ pub fn createDialog(allocator: std.mem.Allocator, path: []const u8) !std.fs.File
                     &raw.writer,
                     db_key,
                     allocator,
+                    io,
                 ) catch |e| {
                     std.log.err("Cannot seal database: {any}", .{e});
                     return error.DatabaseError;
                 };
 
-                var writer = f_db.writer(&.{});
+                var writer = f_db.writer(io, &.{});
                 writer.interface.writeAll(raw.written()) catch |e| {
                     std.log.err("Cannot write to database: {any}", .{e});
                     return error.DatabaseError;
                 };
 
-                const r = std.process.Child.run(.{
-                    .allocator = allocator,
+                const r = std.process.run(allocator, io, .{
                     .argv = &.{
                         "zigenity",
                         "--question",

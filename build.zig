@@ -41,9 +41,9 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "kdbx", .module = kdbx_dep.module("kdbx") },
                 .{ .name = "uuid", .module = uuid_dep.module("uuid") },
             },
+            .link_libc = true,
         }),
     });
-    exe.linkLibC();
 
     b.installArtifact(exe);
 
