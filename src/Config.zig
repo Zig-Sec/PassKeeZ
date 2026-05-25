@@ -1,7 +1,7 @@
 const std = @import("std");
 
-const config_dir_name = ".passkeez";
-const config_name = "config.json";
+pub const config_dir_name = ".passkeez";
+pub const config_name = "config.json";
 
 db_path: []const u8 = "",
 lang: []const u8 = "english",

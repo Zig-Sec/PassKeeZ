@@ -10,6 +10,9 @@ const misc = @import("database/misc.zig");
 conf: Config,
 home: []const u8,
 
+conf_abs_path: []const u8,
+db_abs_path: []const u8,
+
 /// The open database
 ///
 /// This variable is accessed by the main and the authenticator
@@ -41,12 +44,16 @@ pub fn init(a: std.mem.Allocator, io: std.Io, home_: []const u8) !void {
         return e;
     };
 
-    const home = try a.dupe(u8, home_);
-
     s = .{
         .conf = conf,
-        .home = home,
+        .home = try a.dupe(u8, home_),
+        .conf_abs_path = try confPathAlloc(a, home_),
+        .db_abs_path = try dbPathAlloc(a, home_, conf.db_path),
     };
+
+    std.log.info("initialized configuration", .{});
+    std.log.info("conf path: {s}", .{s.?.conf_abs_path});
+    std.log.info("db path: {s}", .{s.?.db_abs_path});
 }
 
 pub fn deinit(a: std.mem.Allocator) void {
@@ -54,17 +61,62 @@ pub fn deinit(a: std.mem.Allocator) void {
         s_.deinitDb();
         s_.conf.deinit(a);
         a.free(s_.home);
+        a.free(s_.db_abs_path);
+        a.free(s_.conf_abs_path);
     }
     s = null;
 }
 
+pub fn reloadConfig(self: *@This(), a: std.mem.Allocator, io: std.Io) !void {
+    std.log.info("reloading configuration", .{});
+
+    // First load new config
+    const conf = Config.load(a, io, self.home) catch |e| {
+        std.log.err("unable to load configuration file ({any})", .{e});
+        return e;
+    };
+    errdefer conf.deinit(a);
+    const db_abs_path = try dbPathAlloc(a, self.home, self.conf.db_path);
+
+    // Deinit old config
+    self.deinitDb();
+    self.conf.deinit(a);
+    a.free(self.db_abs_path);
+
+    // Assign new config
+    self.conf = conf;
+    self.db_abs_path = db_abs_path;
+}
+
 pub fn deinitDb(self: *@This()) void {
     if (self.database) |*db| {
+        std.log.info("deinitializing database", .{});
         db.deinit(db);
     }
+    std.log.info("resetting uv/ up state", .{});
     self.ts = null;
     self.uv_result = UvResult.Denied;
     self.up_result = null;
+}
+
+fn dbPathAlloc(a: std.mem.Allocator, home: []const u8, p: []const u8) ![]const u8 {
+    return if (p.len >= 2 and p[0] == '~' and p[1] == '/') blk: {
+        break :blk try std.fmt.allocPrint(
+            a,
+            "{s}/{s}",
+            .{ home, p },
+        );
+    } else if (p.len >= 1 and p[0] == '/') blk: {
+        break :blk try a.dupe(u8, p);
+    } else error.InvalidPath;
+}
+
+fn confPathAlloc(a: std.mem.Allocator, home: []const u8) ![]const u8 {
+    return std.fmt.allocPrint(
+        a,
+        "{s}/{s}/{s}",
+        .{ home, Config.config_dir_name, Config.config_name },
+    );
 }
 
 pub fn update(self: *@This(), io: std.Io) void {

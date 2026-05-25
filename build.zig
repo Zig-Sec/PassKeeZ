@@ -19,6 +19,11 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const nightwatch = b.dependency("nightwatch", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     const dvui_dep = b.dependency(
         "dvui",
         .{
@@ -44,6 +49,8 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
+
+    exe.root_module.addImport("nightwatch", nightwatch.module("nightwatch"));
 
     b.installArtifact(exe);
 

@@ -20,6 +20,10 @@
             .url = "git+https://github.com/david-vanderson/dvui#5f3f394d78382c434d7c5b152ce476833db542de",
             .hash = "dvui-0.5.0-dev-AQFJmVEc9gBhhgP3p8dN09veUHczWd-6-wo22tahQFdJ",
         },
+        .nightwatch = .{
+            .url = "git+https://github.com/neurocyte/nightwatch#cbb9baab0d2ed66e9a0859e28c4a6a2e61a47600",
+            .hash = "nightwatch-1.0.0-uXzeHzCgAgBNSi0lpwYyPXdiSnZeiExDSiu_XdZO55HI",
+        },
     },
     .paths = .{
         "build.zig",

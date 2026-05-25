@@ -3,6 +3,7 @@ const keylib = @import("keylib");
 const dt = keylib.common.dt;
 const cbor = @import("zbor");
 const uhid = @import("uhid");
+const nightwatch = @import("nightwatch");
 
 const UpResult = keylib.ctap.authenticator.callbacks.UpResult;
 const UvResult = keylib.ctap.authenticator.callbacks.UvResult;
@@ -25,7 +26,48 @@ var fetch_hash: ?[32]u8 = null;
 var fetch_ts: ?i64 = null;
 
 pub const std_options: std.Options = .{
-    .log_level = .warn,
+    .log_level = .info,
+};
+
+// The .polling variant is Linux-only (inotify). Unlike the threaded backends,
+// it does not spawn an internal thread; instead the caller drives event
+// delivery by polling poll_fd() for readability and calling handle_read_ready()
+// whenever data is available. The handler vtable requires an extra
+// wait_readable callback that the backend calls to notify the handler that it
+// should re-arm the fd in its polling loop before the next handle_read_ready().
+//const Watcher = nightwatch.Create(.polling);
+const Watcher = nightwatch.Default;
+
+// On Ubuntu, saving a file is registered as: `close`, `delete`, i.e., we
+// have to act on delete and "rearm" the watcher afterwards.
+var rearm_conf_watcher: bool = false;
+const H = struct {
+    handler: Watcher.Handler,
+
+    const vtable = Watcher.Handler.VTable{ .change = change, .rename = rename };
+
+    fn change(_: *Watcher.Handler, path: []const u8, event: nightwatch.EventType, _: nightwatch.ObjectType) error{HandlerFailed}!void {
+        _ = path;
+        //std.debug.print("rename  {any}  ->  {s}\n", .{ event, path });
+
+        if (event == .deleted) {
+            // As the watcher runs in a different thread, we just set the
+            // flag and handle reloading the configuration in the main loop
+            // to prevent data races.
+            rearm_conf_watcher = true;
+        }
+    }
+
+    fn rename(_: *Watcher.Handler, src: []const u8, dst: []const u8, _: nightwatch.ObjectType) error{HandlerFailed}!void {
+        std.debug.print("rename  {s}  ->  {s}\n", .{ src, dst });
+    }
+
+    // Called by the backend at arm time and after each handle_read_ready().
+    // Return .will_notify (currently the only option) to signal that the
+    // caller's loop will drive delivery.
+    fn wait_readable(_: *Watcher.Handler) error{HandlerFailed}!Watcher.Handler.ReadableStatus {
+        return .will_notify;
+    }
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -41,11 +83,24 @@ pub fn main(init: std.process.Init) !void {
     };
     defer allocator.free(home);
 
+    // State keeps track of the opened database, the config file and all timers.
     State.init(allocator, init.io, home) catch |e| {
         std.log.err("Unable to initialize application ({any})", .{e});
         return std.c.exit(1);
     };
     defer State.deinit(allocator);
+
+    // Setup file watcher for configuration file
+    var h = H{ .handler = .{ .vtable = &H.vtable } };
+    var conf_watcher = try Watcher.init(init.io, allocator, &h.handler);
+    defer conf_watcher.deinit();
+    conf_watcher.watch(State.get().conf_abs_path) catch |e| {
+        std.log.err("start watching configuration file failed ({any})", .{e});
+        std.process.exit(1);
+    };
+    //var pfd = [_]std.posix.pollfd{
+    //    .{ .fd = conf_watcher.poll_fd(), .events = std.posix.POLL.IN, .revents = 0 },
+    //};
 
     // The Auth struct is the most important part of your authenticator. It defines
     // its capabilities and behavior.
@@ -134,6 +189,21 @@ pub fn main(init: std.process.Init) !void {
 
     // This is the main loop
     while (true) {
+        // The `rearm_conf_watcher` tells us that the configuration file
+        // has been changed, i.e., we reload the configuration and "rearm"
+        // the watcher.
+        if (rearm_conf_watcher) {
+            State.get().reloadConfig(allocator, io_) catch |e| {
+                std.log.err("reloading configuration failed ({any})", .{e});
+            };
+
+            conf_watcher.watch(State.get().conf_abs_path) catch |e| {
+                std.log.err("rearming configuration file watcher failed ({any})", .{e});
+            };
+
+            rearm_conf_watcher = false;
+        }
+
         State.get().update(init.io);
 
         // We read in usb packets with a size of 64 bytes.
