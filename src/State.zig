@@ -93,6 +93,7 @@ pub fn deinitDb(self: *@This()) void {
         std.log.info("deinitializing database", .{});
         db.deinit(db);
     }
+    self.database = null;
     std.log.info("resetting uv/ up state", .{});
     self.ts = null;
     self.uv_result = UvResult.Denied;

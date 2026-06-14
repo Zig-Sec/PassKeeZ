@@ -125,7 +125,11 @@ pub fn main(init: std.process.Init) !void {
         // CTAP2 spec!
         .settings = .{
             // Those are the FIDO2 spec you support
-            .versions = &.{ .FIDO_2_0, .FIDO_2_1 },
+            .versions = &.{
+                .FIDO_2_0,
+                .FIDO_2_1,
+                .FIDO_2_2,
+            },
             // The extensions are defined as strings which should make it easy to extend
             // the authenticator (in combination with a new command).
             .extensions = &.{"credProtect"},
@@ -155,19 +159,20 @@ pub fn main(init: std.process.Init) !void {
             // The transports your authenticator supports.
             .transports = &.{.usb},
             // The algorithms you support.
-            .algorithms = &.{.{ .alg = .Es256 }},
+            .algorithms = &.{
+                .{ .alg = .@"ML-DSA-87" },
+                .{ .alg = .@"ML-DSA-65" },
+                .{ .alg = .@"ML-DSA-44" },
+                .{ .alg = .Es256 },
+            },
             .firmwareVersion = 0x0036,
             .remainingDiscoverableCredentials = 100,
         },
         // Here we initialize the pinUvAuth token data structure wich handles the generation
         // and management of pinUvAuthTokens.
         .token = keylib.ctap.pinuv.PinUvAuth.v2(init.io),
-        // Here we set the supported algorithm. You can also implement your
-        // own and add them here.
-        .algorithms = &.{
-            keylib.ctap.crypto.algorithms.Es256,
-        },
         .io = init.io,
+        .allocator = allocator,
         // If you don't want to increment the sign counts
         // of credentials (e.g. because you sync them between devices)
         // set this to true.
@@ -186,6 +191,9 @@ pub fn main(init: std.process.Init) !void {
         return e;
     };
     defer u.close();
+
+    // TODO: REMOVE after testing!
+    var counter: u8 = 0;
 
     // This is the main loop
     while (true) {
@@ -266,8 +274,12 @@ pub fn main(init: std.process.Init) !void {
                         break :blk;
                     };
                 }
+
+                counter += 1;
             }
         }
+
+        if (counter > 20) return;
 
         init.io.sleep(std.Io.Duration.fromMilliseconds(25), .real) catch {};
     }
@@ -419,13 +431,16 @@ pub fn my_read_first(
         if (rp) |rpid| rpid.get() else "n.a.",
     });
 
+    fetch_index = 0;
+    fetch_rp = null;
+    fetch_hash = null;
+    fetch_ts = std.Io.Timestamp.now(io_, .real).toMilliseconds();
+
     if (rp != null or hash != null) {
-        fetch_index = 0;
         fetch_rp = rp;
         fetch_hash = hash;
-        fetch_ts = std.Io.Timestamp.now(io_, .real).toMilliseconds();
 
-        return State.get().database.?.getCredential(&State.get().database.?, if (fetch_rp) |frp| frp.get() else null, hash, &fetch_index.?) catch |e| {
+        const cred = State.get().database.?.getCredential(&State.get().database.?, if (fetch_rp) |frp| frp.get() else null, hash, &fetch_index.?) catch |e| {
             std.log.info("No entry found: {any}", .{e});
             fetch_index = null;
             fetch_rp = null;
@@ -433,12 +448,11 @@ pub fn my_read_first(
             fetch_ts = null;
             return error.DoesNotExist;
         };
-    } else {
-        fetch_index = 0;
-        fetch_rp = null;
-        fetch_hash = null;
-        fetch_ts = std.Io.Timestamp.now(io_, .real).toMilliseconds();
 
+        std.debug.print("\n\nCred: {x}\n\n", .{cred.key.d.?});
+
+        return cred;
+    } else {
         return State.get().database.?.getCredential(&State.get().database.?, null, null, &fetch_index.?) catch |e| {
             std.log.info("No entry found: {any}", .{e});
             fetch_index = null;

@@ -74,6 +74,7 @@ fn deinit(self: *const TDatabase) void {
         self.allocator.destroy(db_);
     }
     self.allocator.free(self.path);
+    std.crypto.secureZero(u8, @constCast(self.pw));
     self.allocator.free(self.pw);
 }
 
@@ -146,7 +147,7 @@ fn getCredential(
 
         if (rp_id) |rpId| {
             if (std.mem.eql(u8, entry.get("KPEX_PASSKEY_RELYING_PARTY").?, rpId)) {
-                return credentialFromEntry(&entry) catch |e| {
+                return credentialFromEntry(&entry, self.allocator) catch |e| {
                     std.log.err("Entry is not a KeePassXC passkey ({any})", .{e});
                     continue;
                 };
@@ -157,13 +158,13 @@ fn getCredential(
             std.crypto.hash.sha2.Sha256.hash(url, &digest, .{});
 
             if (std.mem.eql(u8, &hash, &digest)) {
-                return credentialFromEntry(&entry) catch |e| {
+                return credentialFromEntry(&entry, self.allocator) catch |e| {
                     std.log.err("Entry is not a KeePassXC passkey ({any})", .{e});
                     continue;
                 };
             }
         } else {
-            return credentialFromEntry(&entry) catch |e| {
+            return credentialFromEntry(&entry, self.allocator) catch |e| {
                 std.log.err("Entry is not a KeePassXC passkey ({any})", .{e});
                 continue;
             };
@@ -199,15 +200,17 @@ fn setCredential(
         if (e_) |*e__| e__.deinit();
     }
 
-    const pem_key = switch (data.key) {
-        .P256 => |k| blk: {
-            if (k.alg != .Es256) return error.InvalidCipherSuite;
-            const priv = std.crypto.sign.ecdsa.EcdsaP256Sha256.SecretKey.fromBytes(k.d.?) catch return error.Other;
+    const pem_key = switch (data.key.alg) {
+        .Es256 => blk: {
+            if (data.key.d == null or data.key.d.?.len != std.crypto.sign.ecdsa.EcdsaP256Sha256.SecretKey.encoded_length) return error.InvalidKeyLength;
+
+            const priv = std.crypto.sign.ecdsa.EcdsaP256Sha256.SecretKey.fromBytes(data.key.d.?[0..std.crypto.sign.ecdsa.EcdsaP256Sha256.SecretKey.encoded_length].*) catch return error.Other;
             const kp = std.crypto.sign.ecdsa.EcdsaP256Sha256.KeyPair.fromSecretKey(priv) catch return error.Other;
 
             const pem_key = try kdbx.pem.pemFromKey(kp, self.allocator);
             break :blk pem_key;
         },
+        else => return error.InvalidCipherSuite,
     };
     defer self.allocator.free(pem_key);
 
@@ -378,18 +381,21 @@ pub fn createDialog(allocator: std.mem.Allocator, io: std.Io, path: []const u8, 
     }
 }
 
-fn credentialFromEntry(entry: *const kdbx.Entry) !keylib.ctap.authenticator.Credential {
+fn credentialFromEntry(entry: *const kdbx.Entry, allocator: std.mem.Allocator) !keylib.ctap.authenticator.Credential {
     // we have already verified that this is a valid KeePassXC passkey
-    var buffer: [8192]u8 = .{0} ** 8192;
-    var fba = std.heap.FixedBufferAllocator.init(&buffer);
-    const allocator = fba.allocator();
 
     const pem_key = entry.get("KPEX_PASSKEY_PRIVATE_KEY_PEM").?;
     const k_ = kdbx.pem.asymmetricKeyPairFromPem(pem_key, allocator) catch return error.InvalidKey;
 
     const k = switch (k_) {
-        .EcdsaP256Sha256 => |k| cbor.cose.Key.fromP256PrivPub(.Es256, k.secret_key, k.public_key),
+        .EcdsaP256Sha256 => |k| try cbor.cose.Key.fromP256PrivPub(
+            .Es256,
+            k.secret_key,
+            k.public_key,
+            allocator,
+        ),
     };
+    errdefer k.deinit(allocator);
 
     const cred_id = entry.get("KPEX_PASSKEY_CREDENTIAL_ID").?;
     const user_name = entry.get("KPEX_PASSKEY_USERNAME").?;
@@ -398,7 +404,10 @@ fn credentialFromEntry(entry: *const kdbx.Entry) !keylib.ctap.authenticator.Cred
 
     const l = try std.base64.standard.Decoder.calcSizeForSlice(user_handle);
     const uid = try allocator.alloc(u8, l);
-    defer std.crypto.secureZero(u8, uid);
+    defer {
+        std.crypto.secureZero(u8, uid);
+        allocator.free(uid);
+    }
     try std.base64.standard.Decoder.decode(uid, user_handle);
 
     return .{
