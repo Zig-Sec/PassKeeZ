@@ -1,5 +1,5 @@
 [Unit]
-Description=FIDO2 compatible authenticator for Linux 0.7.0-alpha
+Description=FIDO2 compatible authenticator for Linux
 After=network.target
 
 [Service]
