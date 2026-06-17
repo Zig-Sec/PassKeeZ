@@ -135,6 +135,7 @@ fn getCredential(
     rp_id: ?[]const u8,
     rp_id_hash: ?[32]u8,
     idx: *usize,
+    aexternal: std.mem.Allocator,
 ) TDatabase.Error!Credential {
     const db: *kdbx.Database = @as(*kdbx.Database, @ptrCast(@alignCast(self.db.?)));
 
@@ -147,7 +148,11 @@ fn getCredential(
 
         if (rp_id) |rpId| {
             if (std.mem.eql(u8, entry.get("KPEX_PASSKEY_RELYING_PARTY").?, rpId)) {
-                return credentialFromEntry(&entry, self.allocator) catch |e| {
+                return credentialFromEntry(
+                    &entry,
+                    self.allocator,
+                    aexternal,
+                ) catch |e| {
                     std.log.err("Entry is not a KeePassXC passkey ({any})", .{e});
                     continue;
                 };
@@ -158,13 +163,21 @@ fn getCredential(
             std.crypto.hash.sha2.Sha256.hash(url, &digest, .{});
 
             if (std.mem.eql(u8, &hash, &digest)) {
-                return credentialFromEntry(&entry, self.allocator) catch |e| {
+                return credentialFromEntry(
+                    &entry,
+                    self.allocator,
+                    aexternal,
+                ) catch |e| {
                     std.log.err("Entry is not a KeePassXC passkey ({any})", .{e});
                     continue;
                 };
             }
         } else {
-            return credentialFromEntry(&entry, self.allocator) catch |e| {
+            return credentialFromEntry(
+                &entry,
+                self.allocator,
+                aexternal,
+            ) catch |e| {
                 std.log.err("Entry is not a KeePassXC passkey ({any})", .{e});
                 continue;
             };
@@ -381,7 +394,11 @@ pub fn createDialog(allocator: std.mem.Allocator, io: std.Io, path: []const u8, 
     }
 }
 
-fn credentialFromEntry(entry: *const kdbx.Entry, allocator: std.mem.Allocator) !keylib.ctap.authenticator.Credential {
+fn credentialFromEntry(
+    entry: *const kdbx.Entry,
+    allocator: std.mem.Allocator,
+    aexternal: std.mem.Allocator,
+) !keylib.ctap.authenticator.Credential {
     // we have already verified that this is a valid KeePassXC passkey
 
     const pem_key = entry.get("KPEX_PASSKEY_PRIVATE_KEY_PEM").?;
@@ -392,10 +409,10 @@ fn credentialFromEntry(entry: *const kdbx.Entry, allocator: std.mem.Allocator) !
             .Es256,
             k.secret_key,
             k.public_key,
-            allocator,
+            aexternal,
         ),
     };
-    errdefer k.deinit(allocator);
+    errdefer k.deinit(aexternal);
 
     const cred_id = entry.get("KPEX_PASSKEY_CREDENTIAL_ID").?;
     const user_name = entry.get("KPEX_PASSKEY_USERNAME").?;

@@ -26,7 +26,7 @@ var fetch_hash: ?[32]u8 = null;
 var fetch_ts: ?i64 = null;
 
 pub const std_options: std.Options = .{
-    .log_level = .info,
+    .log_level = .warn,
 };
 
 // The .polling variant is Linux-only (inotify). Unlike the threaded backends,
@@ -59,7 +59,7 @@ const H = struct {
     }
 
     fn rename(_: *Watcher.Handler, src: []const u8, dst: []const u8, _: nightwatch.ObjectType) error{HandlerFailed}!void {
-        std.debug.print("rename  {s}  ->  {s}\n", .{ src, dst });
+        std.log.info("rename  {s}  ->  {s}\n", .{ src, dst });
     }
 
     // Called by the backend at arm time and after each handle_read_ready().
@@ -172,6 +172,19 @@ pub fn main(init: std.process.Init) !void {
         // and management of pinUvAuthTokens.
         .token = keylib.ctap.pinuv.PinUvAuth.v2(init.io),
         .io = init.io,
+        // This allocator is used by the authenticator instance and is
+        // also passed to every callback.
+        //
+        // As a general rule:
+        // 1. If pass a credential to the authenticator instance via
+        //    a read or read_next callback, make sure to copy the all
+        //    dynamic fields of the `Credential` (currently this is
+        //    only the `key`). The instance will automatically call deinit
+        //    on the credential after use, when using the default
+        //    command handlers.
+        // 2. If you receive a credential (e.g., via write), make sure to copy it before
+        //    making any modifications. The authenticator is responsible
+        //    for freeing the passed `Credential`.
         .allocator = allocator,
         // If you don't want to increment the sign counts
         // of credentials (e.g. because you sync them between devices)
@@ -191,9 +204,6 @@ pub fn main(init: std.process.Init) !void {
         return e;
     };
     defer u.close();
-
-    // TODO: REMOVE after testing!
-    var counter: u8 = 0;
 
     // This is the main loop
     while (true) {
@@ -274,12 +284,8 @@ pub fn main(init: std.process.Init) !void {
                         break :blk;
                     };
                 }
-
-                counter += 1;
             }
         }
-
-        if (counter > 20) return;
 
         init.io.sleep(std.Io.Duration.fromMilliseconds(25), .real) catch {};
     }
@@ -362,11 +368,15 @@ pub fn my_uv(
     /// The pinHash can be used for comparison with the stored PIN hash
     /// when using PIN based authentication.
     pinHash: ?[]const u8,
+    a: std.mem.Allocator,
+    io: std.Io,
 ) UvResult {
     _ = info;
     _ = user;
     _ = rp;
     _ = pinHash;
+    _ = a;
+    _ = io;
 
     return State.get().uv_result;
 }
@@ -378,9 +388,13 @@ pub fn my_up(
     user: ?keylib.common.User,
     /// Information about the relying party (e.g., `Github (github.com)`)
     rp: ?keylib.common.RelyingParty,
+    a: std.mem.Allocator,
+    io: std.Io,
 ) UpResult {
     _ = info;
     _ = user;
+    _ = a;
+    _ = io;
 
     std.log.info("up: {any}", .{State.get().up_result});
     if (State.get().up_result) |r| return r;
@@ -425,7 +439,11 @@ pub fn my_read_first(
     id: ?dt.ABS64B,
     rp: ?dt.ABS128T,
     hash: ?[32]u8,
+    a: std.mem.Allocator,
+    io: std.Io,
 ) CallbackError!Credential {
+    _ = io;
+
     std.log.info("my_first_read:\n  id:   {s}\n  rpId: {s}", .{
         if (id) |uid| uid.get() else "n.a.",
         if (rp) |rpid| rpid.get() else "n.a.",
@@ -440,7 +458,7 @@ pub fn my_read_first(
         fetch_rp = rp;
         fetch_hash = hash;
 
-        const cred = State.get().database.?.getCredential(&State.get().database.?, if (fetch_rp) |frp| frp.get() else null, hash, &fetch_index.?) catch |e| {
+        const cred = State.get().database.?.getCredential(&State.get().database.?, if (fetch_rp) |frp| frp.get() else null, hash, &fetch_index.?, a) catch |e| {
             std.log.info("No entry found: {any}", .{e});
             fetch_index = null;
             fetch_rp = null;
@@ -449,11 +467,9 @@ pub fn my_read_first(
             return error.DoesNotExist;
         };
 
-        std.debug.print("\n\nCred: {x}\n\n", .{cred.key.d.?});
-
         return cred;
     } else {
-        return State.get().database.?.getCredential(&State.get().database.?, null, null, &fetch_index.?) catch |e| {
+        return State.get().database.?.getCredential(&State.get().database.?, null, null, &fetch_index.?, a) catch |e| {
             std.log.info("No entry found: {any}", .{e});
             fetch_index = null;
             fetch_rp = null;
@@ -466,7 +482,12 @@ pub fn my_read_first(
     return error.DoesNotExist;
 }
 
-pub fn my_read_next() CallbackError!Credential {
+pub fn my_read_next(
+    a: std.mem.Allocator,
+    io: std.Io,
+) CallbackError!Credential {
+    _ = io;
+
     std.log.info("my_read_next: fetch_ts {any}, fetch_index {any}, fetch_rp {any}", .{ fetch_ts, fetch_index, fetch_rp });
     if (fetch_ts == null or fetch_index == null) {
         fetch_index = null;
@@ -477,7 +498,7 @@ pub fn my_read_next() CallbackError!Credential {
         return error.Other;
     }
 
-    return State.get().database.?.getCredential(&State.get().database.?, if (fetch_rp) |rp| rp.get() else null, fetch_hash, &fetch_index.?) catch |e| {
+    return State.get().database.?.getCredential(&State.get().database.?, if (fetch_rp) |rp| rp.get() else null, fetch_hash, &fetch_index.?, a) catch |e| {
         std.log.info("No entry found: {any}", .{e});
         fetch_index = null;
         fetch_rp = null;
@@ -489,28 +510,49 @@ pub fn my_read_next() CallbackError!Credential {
 
 pub fn my_write(
     data: Credential,
+    a: std.mem.Allocator,
+    io: std.Io,
 ) CallbackError!void {
+    _ = a;
+    _ = io;
+
     State.get().database.?.setCredential(&State.get().database.?, data) catch {
         return error.Other;
     };
 }
 
 pub fn my_delete(
-    id: [*c]const u8,
-) callconv(.c) Error {
+    id: []const u8,
+    a: std.mem.Allocator,
+    io: std.Io,
+) CallbackError!void {
     _ = id;
-    // TODO: remove this from keylib!
+    _ = a;
+    _ = io;
 
-    return Error.Other;
+    return error.Other;
 }
 
-pub fn my_read_settings() Meta {
+pub fn my_read_settings(
+    a: std.mem.Allocator,
+    io: std.Io,
+) Meta {
+    _ = a;
+    _ = io;
+
     return Meta{
         .always_uv = true,
     };
 }
 
-pub fn my_write_settings(data: Meta) void {
+pub fn my_write_settings(
+    data: Meta,
+    a: std.mem.Allocator,
+    io: std.Io,
+) void {
+    _ = a;
+    _ = io;
+
     _ = data;
 }
 

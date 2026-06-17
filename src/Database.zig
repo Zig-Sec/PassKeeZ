@@ -42,6 +42,7 @@ getCredential: *const fn (
     rpId: ?[]const u8,
     rpIdHash: ?[32]u8,
     idx: *usize,
+    aexternal: std.mem.Allocator,
 ) Error!Credential,
 
 setCredential: *const fn (
