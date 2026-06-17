@@ -99,7 +99,7 @@ function install_passkeez {
     # systemctl --user status passkeez.service
     #cp script/passkeez.service /etc/systemd/user/passkeez.service
     mkdir -p /home/${SUDO_USER}/.local/share/systemd/user
-    curl -L -# -C - -o "/home/${SUDO_USER}/.local/share/systemd/user/passkeez.service" "https://codeberg.org/r4gus/PassKeeZ/raw/branch/master/script/passkeez.service"
+    curl -L -# -C - -o "/home/${SUDO_USER}/.local/share/systemd/user/passkeez.service" "https://codeberg.org/r4gus/PassKeeZ/raw/branch/${PASSKEEZ_VERSION}/script/passkeez.service"
 }
 
 function install_zigenity {
