@@ -66,6 +66,15 @@ All contributions are welcome! Including:
 ## QA
 
 <details>
+<summary><ins>Should I use PassKeeZ?</ins></summary>
+
+This is totally up to you and probably depends on what you want to achieve.
+
+If you're primarily interested in secure passkey-based authentication on the web and want to stay in control over your credentials, you could consider using PassKeeZ. PassKeeZ offers from my point of view a better user experience compared to KeePassXC, as one doesn't have to install additional browser plugins, while being compatible with all KeePass password managers, i.e., you can use PassKeeZ for passkey-based authentication and keep managing your credentials with your most favourite KDBX capable password manager (e.g., KeePass, KeePassXC, ...).
+
+</details>
+
+<details>
 <summary><ins>What is this project about?</ins></summary>
 
 FIDO2 stands as a dedicated authentication protocol crafted for diverse authentication needs. Whether employed as a standalone method, supplanting traditional password-based authentication, or as an additional layer of security, FIDO2 serves both purposes. The FIDO Alliance has actively advocated for the widespread adoption of this protocol for several years, with 2023 witnessing a substantial surge in its adoption. However, it's crucial to note that FIDO2 introduces a heightened level of complexity in comparison to conventional passwords. Notably, the use of roaming authenticators, such as YubiKey, can be a cost-intensive aspect.
@@ -78,7 +87,7 @@ Conversely, platform authenticators present a more flexible and cost-effective a
 
 One key advantage lies in their cost-effectiveness, eliminating the need for additional hardware. When implemented with precision, platform authenticators can attain a commendable level of security, providing a compelling alternative to their more expensive counterparts.
 
-The primary objective of this project is to furnish an alternative —keeping in mind that the term "alternative" is subjective and, due to resource constraints, I may not offer a polished, "commercial-grade" product— to existing commercial Passkey implementations.
+The primary objective of this project is to furnish an alternative, keeping in mind that the term "alternative" is subjective, to existing commercial Passkey implementations.
 
 </details>
 

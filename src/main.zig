@@ -14,7 +14,6 @@ const Meta = keylib.ctap.authenticator.Meta;
 
 var gpa = std.heap.DebugAllocator(.{}){};
 const allocator = gpa.allocator();
-var io_: std.Io = undefined; // initialized right after startup
 
 const State = @import("State.zig");
 
@@ -28,6 +27,10 @@ var fetch_ts: ?i64 = null;
 pub const std_options: std.Options = .{
     .log_level = .warn,
 };
+
+const c = @cImport({
+    @cInclude("sys/mman.h");
+});
 
 // The .polling variant is Linux-only (inotify). Unlike the threaded backends,
 // it does not spawn an internal thread; instead the caller drives event
@@ -73,7 +76,7 @@ const H = struct {
 pub fn main(init: std.process.Init) !void {
     defer _ = gpa.detectLeaks();
 
-    io_ = init.io;
+    _ = c.mlockall(c.MCL_CURRENT | c.MCL_FUTURE);
 
     // We need the path to the home folder.
     // TODO: add command line argument as backup
@@ -211,7 +214,7 @@ pub fn main(init: std.process.Init) !void {
         // has been changed, i.e., we reload the configuration and "rearm"
         // the watcher.
         if (rearm_conf_watcher) {
-            State.get().reloadConfig(allocator, io_) catch |e| {
+            State.get().reloadConfig(allocator, init.io) catch |e| {
                 std.log.err("reloading configuration failed ({any})", .{e});
             };
 
@@ -394,7 +397,6 @@ pub fn my_up(
     _ = info;
     _ = user;
     _ = a;
-    _ = io;
 
     std.log.info("up: {any}", .{State.get().up_result});
     if (State.get().up_result) |r| return r;
@@ -408,7 +410,7 @@ pub fn my_up(
     };
     defer allocator.free(text);
 
-    const r = std.process.run(allocator, io_, .{
+    const r = std.process.run(allocator, io, .{
         .argv = &.{
             "zigenity",
             "--question",
@@ -442,8 +444,6 @@ pub fn my_read_first(
     a: std.mem.Allocator,
     io: std.Io,
 ) CallbackError!Credential {
-    _ = io;
-
     std.log.info("my_first_read:\n  id:   {s}\n  rpId: {s}", .{
         if (id) |uid| uid.get() else "n.a.",
         if (rp) |rpid| rpid.get() else "n.a.",
@@ -452,7 +452,7 @@ pub fn my_read_first(
     fetch_index = 0;
     fetch_rp = null;
     fetch_hash = null;
-    fetch_ts = std.Io.Timestamp.now(io_, .real).toMilliseconds();
+    fetch_ts = std.Io.Timestamp.now(io, .real).toMilliseconds();
 
     if (rp != null or hash != null) {
         fetch_rp = rp;
