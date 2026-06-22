@@ -76,6 +76,7 @@ const H = struct {
 pub fn main(init: std.process.Init) !void {
     defer _ = gpa.detectLeaks();
 
+    // Do NOT swap out memory.
     _ = c.mlockall(c.MCL_CURRENT | c.MCL_FUTURE);
 
     // We need the path to the home folder.
