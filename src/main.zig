@@ -17,8 +17,6 @@ const allocator = gpa.allocator();
 
 const State = @import("State.zig");
 
-var initialized = false;
-
 var fetch_index: ?usize = null;
 var fetch_rp: ?dt.ABS128T = null;
 var fetch_hash: ?[32]u8 = null;
@@ -83,7 +81,7 @@ pub fn main(init: std.process.Init) !void {
     // TODO: add command line argument as backup
     const home = init.minimal.environ.getAlloc(allocator, "HOME") catch |e| {
         std.log.err("missing \"HOME\" environment variable ({any})", .{e});
-        return;
+        std.process.exit(1);
     };
     defer allocator.free(home);
 
@@ -199,6 +197,10 @@ pub fn main(init: std.process.Init) !void {
         .constSignCount = true,
         .general_backup_eligibility = true,
     };
+    auth.init() catch |e| {
+        std.log.err("[main]: failed to initialize authenticator ({any})", .{e});
+        std.process.exit(1);
+    };
 
     // Here we instantiate a CTAPHID handler.
     var ctaphid = keylib.ctap.transports.ctaphid.authenticator.CtapHid.init(allocator, init.io);
@@ -208,7 +210,7 @@ pub fn main(init: std.process.Init) !void {
     // tinyusb or something similar you have to adapt the code.
     var u = uhid.Uhid.open(init.io, "PassKeeZ authenticator") catch |e| {
         std.log.err("unable to open uhid device ({any})", .{e});
-        return e;
+        std.process.exit(1);
     };
     defer u.close();
 
@@ -240,47 +242,16 @@ pub fn main(init: std.process.Init) !void {
             // Once a message is complete (or an error has occured) you
             // get a response.
             if (response) |*res| blk: {
-                var skip = false;
-
                 switch (res.cmd) {
+                    // Here we check if its a cbor message and if so, pass
+                    // it to the handle() function of our authenticator.
                     .cbor => {
-                        // We have to handle this here as we don't need to
-                        // decrypt the database for this
-                        if (res._data[0] == 0x0b) { // authenticator selection
-                            res._data[0] = @intFromEnum(authenticatorSelection(State.get(), init.io));
-                            res.len = 1;
-                            skip = true;
-                        }
+                        var out: [7609]u8 = undefined;
+                        const r = auth.handle(&out, res.getData());
+                        @memcpy(res._data[0..r.len], r);
+                        res.len = r.len;
                     },
                     else => {},
-                }
-
-                if (!skip) {
-                    State.get().authenticate(allocator, init.io) catch |e| {
-                        std.log.err("authentication failed ({any})", .{e});
-                        res._data[0] = 0x3f;
-                        res.len = 1;
-                        skip = true;
-                    };
-                }
-
-                if (!skip) {
-                    if (!initialized) {
-                        try auth.init();
-                        initialized = true;
-                    }
-
-                    switch (res.cmd) {
-                        // Here we check if its a cbor message and if so, pass
-                        // it to the handle() function of our authenticator.
-                        .cbor => {
-                            var out: [7609]u8 = undefined;
-                            const r = auth.handle(&out, res.getData());
-                            @memcpy(res._data[0..r.len], r);
-                            res.len = r.len;
-                        },
-                        else => {},
-                    }
                 }
 
                 var iter = res.iterator();
@@ -382,8 +353,11 @@ pub fn my_uv(
     _ = user;
     _ = rp;
     _ = pinHash;
-    _ = a;
-    _ = io;
+
+    State.get().authenticate(a, io) catch |e| {
+        std.log.err("[my_uv]: authentication failed ({any})", .{e});
+        return UvResult.Denied;
+    };
 
     return State.get().uv_result;
 }
@@ -402,7 +376,7 @@ pub fn my_up(
     _ = user;
     _ = a;
 
-    std.log.info("up: {any}", .{State.get().up_result});
+    std.log.info("[my_up]: {any}", .{State.get().up_result});
     if (State.get().up_result) |r| return r;
 
     const text = std.fmt.allocPrint(allocator, "{s} {s}", .{

@@ -76,7 +76,11 @@ pub fn reloadConfig(self: *@This(), a: std.mem.Allocator, io: std.Io) !void {
         return e;
     };
     errdefer conf.deinit(a);
-    const db_abs_path = try dbPathAlloc(a, self.home, self.conf.db_path);
+
+    std.log.info("  home: {s}", .{self.home});
+    std.log.info("  conf.db_path: {s}", .{conf.db_path});
+
+    const db_abs_path = try dbPathAlloc(a, self.home, conf.db_path);
 
     // Deinit old config
     self.deinitDb();
