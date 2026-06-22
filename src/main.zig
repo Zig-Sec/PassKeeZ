@@ -25,7 +25,7 @@ var fetch_hash: ?[32]u8 = null;
 var fetch_ts: ?i64 = null;
 
 pub const std_options: std.Options = .{
-    .log_level = .warn,
+    .log_level = .info,
 };
 
 const c = @cImport({
@@ -135,7 +135,10 @@ pub fn main(init: std.process.Init) !void {
             },
             // The extensions are defined as strings which should make it easy to extend
             // the authenticator (in combination with a new command).
-            .extensions = &.{"credProtect"},
+            .extensions = &.{
+                "credProtect",
+                "hmac-secret",
+            },
             // This should be unique for all models of the same authenticator.
             .aaguid = "\x73\x79\x63\x2e\x70\x61\x73\x73\x6b\x65\x65\x7a\x2e\x6f\x72\x67".*,
             .options = .{
