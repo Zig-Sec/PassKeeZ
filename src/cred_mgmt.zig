@@ -100,7 +100,13 @@ pub fn enumerateRPsBegin(auth: *keylib.ctap.authenticator.Auth, req: *const Requ
         return .{};
     }
 
-    var cred = auth.callbacks.read_first(null, null, null) catch {
+    var cred = auth.callbacks.read_first(
+        null,
+        null,
+        null,
+        auth.allocator,
+        auth.io,
+    ) catch {
         // If no discoverable credentials exist on this authenticator, return CTAP2_ERR_NO_CREDENTIALS.
         status.* = .ctap2_err_no_credentials;
         return .{};
@@ -115,7 +121,10 @@ pub fn enumerateRPsBegin(auth: *keylib.ctap.authenticator.Auth, req: *const Requ
     };
 
     outer: while (true) {
-        cred = auth.callbacks.read_next() catch {
+        cred = auth.callbacks.read_next(
+            auth.allocator,
+            auth.io,
+        ) catch {
             break;
         };
 
@@ -181,13 +190,22 @@ pub fn getCredsMetadata(auth: *keylib.ctap.authenticator.Auth, req: *const Reque
     }
 
     var credential_count: u32 = 1;
-    _ = auth.callbacks.read_first(null, null, null) catch {
+    _ = auth.callbacks.read_first(
+        null,
+        null,
+        null,
+        auth.allocator,
+        auth.io,
+    ) catch {
         credential_count -= 1;
     };
 
     if (credential_count > 0) {
         while (true) {
-            _ = auth.callbacks.read_next() catch {
+            _ = auth.callbacks.read_next(
+                auth.allocator,
+                auth.io,
+            ) catch {
                 break;
             };
             credential_count += 1;
@@ -253,7 +271,13 @@ pub fn enumerateCredentialsBegin(auth: *keylib.ctap.authenticator.Auth, req: *co
         }
     }
 
-    _ = auth.callbacks.read_first(null, null, req.subCommandParams.?.rpIDHash.?) catch {
+    _ = auth.callbacks.read_first(
+        null,
+        null,
+        req.subCommandParams.?.rpIDHash.?,
+        auth.allocator,
+        auth.io,
+    ) catch {
         // If no discoverable credentials exist on this authenticator, return CTAP2_ERR_NO_CREDENTIALS.
         status.* = .ctap2_err_no_credentials;
         return .{};
@@ -261,13 +285,22 @@ pub fn enumerateCredentialsBegin(auth: *keylib.ctap.authenticator.Auth, req: *co
 
     var credential_count: u32 = 1;
     while (true) {
-        _ = auth.callbacks.read_next() catch {
+        _ = auth.callbacks.read_next(
+            auth.allocator,
+            auth.io,
+        ) catch {
             break;
         };
         credential_count += 1;
     }
 
-    const cred = auth.callbacks.read_first(null, null, req.subCommandParams.?.rpIDHash.?) catch {
+    const cred = auth.callbacks.read_first(
+        null,
+        null,
+        req.subCommandParams.?.rpIDHash.?,
+        auth.allocator,
+        auth.io,
+    ) catch {
         // If no discoverable credentials exist on this authenticator, return CTAP2_ERR_NO_CREDENTIALS.
         status.* = .ctap2_err_no_credentials;
         return .{};
@@ -286,7 +319,10 @@ pub fn enumerateCredentialsBegin(auth: *keylib.ctap.authenticator.Auth, req: *co
 }
 
 pub fn enumerateCredentialsGetNextCredential(auth: *keylib.ctap.authenticator.Auth, status: *keylib.ctap.StatusCodes) Response {
-    const cred = auth.callbacks.read_next() catch {
+    const cred = auth.callbacks.read_next(
+        auth.allocator,
+        auth.io,
+    ) catch {
         status.* = .ctap2_err_no_credentials;
         return .{};
     };

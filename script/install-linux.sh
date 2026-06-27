@@ -1,8 +1,8 @@
 #!/bin/bash
 
-PASSKEEZ_VERSION="0.6.3"
-ZIGENITY_VERSION="0.7.1"
-ZIG_VERSION="0.15.1"
+PASSKEEZ_VERSION="0.7.0-alpha"
+ZIGENITY_VERSION="0.8.0"
+ZIG_VERSION="0.16.0"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -99,7 +99,7 @@ function install_passkeez {
     # systemctl --user status passkeez.service
     #cp script/passkeez.service /etc/systemd/user/passkeez.service
     mkdir -p /home/${SUDO_USER}/.local/share/systemd/user
-    curl -L -# -C - -o "/home/${SUDO_USER}/.local/share/systemd/user/passkeez.service" "https://codeberg.org/r4gus/PassKeeZ/raw/branch/master/script/passkeez.service"
+    curl -L -# -C - -o "/home/${SUDO_USER}/.local/share/systemd/user/passkeez.service" "https://codeberg.org/r4gus/PassKeeZ/raw/branch/${PASSKEEZ_VERSION}/script/passkeez.service"
 }
 
 function install_zigenity {

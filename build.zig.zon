@@ -1,6 +1,6 @@
 .{
     .name = .passkeez,
-    .version = "0.7.0",
+    .version = "0.7.0-alpha",
     .minimum_zig_version = "0.16.0",
     .fingerprint = 0xdd1692d15d21a6f6,
     .dependencies = .{
@@ -13,8 +13,8 @@
             .hash = "kdbx-0.5.0-eJXZBEioEwBm8vW0-QYTGr29XL5GmMv9XHtxvRvord4L",
         },
         .keylib = .{
-            .url = "git+https://codeberg.org/r4gus/keylib#a0a80a79f83582df9bc2bd50429cf8b065042da2",
-            .hash = "keylib-0.10.0-mbYjk9s2CwBvZAtqjCwjk-eoyP5QX3bGu2trmgIX9CXn",
+            .url = "git+https://codeberg.org/r4gus/keylib?ref=web#8a47083477ed9192811f1ded85388323c4c9f825",
+            .hash = "keylib-0.10.0-alpha-mbYjk-nhCwBZx-i78h3bJf6bv_b2_lk_Ily_HiiN-HoQ",
         },
         .dvui = .{
             .url = "git+https://github.com/david-vanderson/dvui#5f3f394d78382c434d7c5b152ce476833db542de",

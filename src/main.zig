@@ -14,20 +14,15 @@ const Meta = keylib.ctap.authenticator.Meta;
 
 var gpa = std.heap.DebugAllocator(.{}){};
 const allocator = gpa.allocator();
-var io_: std.Io = undefined; // initialized right after startup
 
 const State = @import("State.zig");
-
-var initialized = false;
 
 var fetch_index: ?usize = null;
 var fetch_rp: ?dt.ABS128T = null;
 var fetch_hash: ?[32]u8 = null;
 var fetch_ts: ?i64 = null;
 
-pub const std_options: std.Options = .{
-    .log_level = .info,
-};
+const c = @import("c");
 
 // The .polling variant is Linux-only (inotify). Unlike the threaded backends,
 // it does not spawn an internal thread; instead the caller drives event
@@ -59,7 +54,7 @@ const H = struct {
     }
 
     fn rename(_: *Watcher.Handler, src: []const u8, dst: []const u8, _: nightwatch.ObjectType) error{HandlerFailed}!void {
-        std.debug.print("rename  {s}  ->  {s}\n", .{ src, dst });
+        std.log.debug("rename  {s}  ->  {s}\n", .{ src, dst });
     }
 
     // Called by the backend at arm time and after each handle_read_ready().
@@ -73,13 +68,14 @@ const H = struct {
 pub fn main(init: std.process.Init) !void {
     defer _ = gpa.detectLeaks();
 
-    io_ = init.io;
+    // Do NOT swap out memory.
+    _ = c.mlockall(c.MCL_CURRENT | c.MCL_FUTURE);
 
     // We need the path to the home folder.
     // TODO: add command line argument as backup
     const home = init.minimal.environ.getAlloc(allocator, "HOME") catch |e| {
         std.log.err("missing \"HOME\" environment variable ({any})", .{e});
-        return;
+        std.process.exit(1);
     };
     defer allocator.free(home);
 
@@ -125,10 +121,17 @@ pub fn main(init: std.process.Init) !void {
         // CTAP2 spec!
         .settings = .{
             // Those are the FIDO2 spec you support
-            .versions = &.{ .FIDO_2_0, .FIDO_2_1 },
+            .versions = &.{
+                .FIDO_2_0,
+                .FIDO_2_1,
+                .FIDO_2_2,
+            },
             // The extensions are defined as strings which should make it easy to extend
             // the authenticator (in combination with a new command).
-            .extensions = &.{"credProtect"},
+            .extensions = &.{
+                "credProtect",
+                "hmac-secret",
+            },
             // This should be unique for all models of the same authenticator.
             .aaguid = "\x73\x79\x63\x2e\x70\x61\x73\x73\x6b\x65\x65\x7a\x2e\x6f\x72\x67".*,
             .options = .{
@@ -155,24 +158,42 @@ pub fn main(init: std.process.Init) !void {
             // The transports your authenticator supports.
             .transports = &.{.usb},
             // The algorithms you support.
-            .algorithms = &.{.{ .alg = .Es256 }},
+            .algorithms = &.{
+                .{ .alg = .@"ML-DSA-87" },
+                .{ .alg = .@"ML-DSA-65" },
+                .{ .alg = .@"ML-DSA-44" },
+                .{ .alg = .Es256 },
+            },
             .firmwareVersion = 0x0036,
             .remainingDiscoverableCredentials = 100,
         },
         // Here we initialize the pinUvAuth token data structure wich handles the generation
         // and management of pinUvAuthTokens.
         .token = keylib.ctap.pinuv.PinUvAuth.v2(init.io),
-        // Here we set the supported algorithm. You can also implement your
-        // own and add them here.
-        .algorithms = &.{
-            keylib.ctap.crypto.algorithms.Es256,
-        },
         .io = init.io,
+        // This allocator is used by the authenticator instance and is
+        // also passed to every callback.
+        //
+        // As a general rule:
+        // 1. If pass a credential to the authenticator instance via
+        //    a read or read_next callback, make sure to copy the all
+        //    dynamic fields of the `Credential` (currently this is
+        //    only the `key`). The instance will automatically call deinit
+        //    on the credential after use, when using the default
+        //    command handlers.
+        // 2. If you receive a credential (e.g., via write), make sure to copy it before
+        //    making any modifications. The authenticator is responsible
+        //    for freeing the passed `Credential`.
+        .allocator = allocator,
         // If you don't want to increment the sign counts
         // of credentials (e.g. because you sync them between devices)
         // set this to true.
         .constSignCount = true,
         .general_backup_eligibility = true,
+    };
+    auth.init() catch |e| {
+        std.log.err("[main]: failed to initialize authenticator ({any})", .{e});
+        std.process.exit(1);
     };
 
     // Here we instantiate a CTAPHID handler.
@@ -183,7 +204,7 @@ pub fn main(init: std.process.Init) !void {
     // tinyusb or something similar you have to adapt the code.
     var u = uhid.Uhid.open(init.io, "PassKeeZ authenticator") catch |e| {
         std.log.err("unable to open uhid device ({any})", .{e});
-        return e;
+        std.process.exit(1);
     };
     defer u.close();
 
@@ -193,7 +214,7 @@ pub fn main(init: std.process.Init) !void {
         // has been changed, i.e., we reload the configuration and "rearm"
         // the watcher.
         if (rearm_conf_watcher) {
-            State.get().reloadConfig(allocator, io_) catch |e| {
+            State.get().reloadConfig(allocator, init.io) catch |e| {
                 std.log.err("reloading configuration failed ({any})", .{e});
             };
 
@@ -215,47 +236,16 @@ pub fn main(init: std.process.Init) !void {
             // Once a message is complete (or an error has occured) you
             // get a response.
             if (response) |*res| blk: {
-                var skip = false;
-
                 switch (res.cmd) {
+                    // Here we check if its a cbor message and if so, pass
+                    // it to the handle() function of our authenticator.
                     .cbor => {
-                        // We have to handle this here as we don't need to
-                        // decrypt the database for this
-                        if (res._data[0] == 0x0b) { // authenticator selection
-                            res._data[0] = @intFromEnum(authenticatorSelection(State.get(), init.io));
-                            res.len = 1;
-                            skip = true;
-                        }
+                        var out: [7609]u8 = undefined;
+                        const r = auth.handle(&out, res.getData());
+                        @memcpy(res._data[0..r.len], r);
+                        res.len = r.len;
                     },
                     else => {},
-                }
-
-                if (!skip) {
-                    State.get().authenticate(allocator, init.io) catch |e| {
-                        std.log.err("authentication failed ({any})", .{e});
-                        res._data[0] = 0x3f;
-                        res.len = 1;
-                        skip = true;
-                    };
-                }
-
-                if (!skip) {
-                    if (!initialized) {
-                        try auth.init();
-                        initialized = true;
-                    }
-
-                    switch (res.cmd) {
-                        // Here we check if its a cbor message and if so, pass
-                        // it to the handle() function of our authenticator.
-                        .cbor => {
-                            var out: [7609]u8 = undefined;
-                            const r = auth.handle(&out, res.getData());
-                            @memcpy(res._data[0..r.len], r);
-                            res.len = r.len;
-                        },
-                        else => {},
-                    }
                 }
 
                 var iter = res.iterator();
@@ -350,11 +340,18 @@ pub fn my_uv(
     /// The pinHash can be used for comparison with the stored PIN hash
     /// when using PIN based authentication.
     pinHash: ?[]const u8,
+    a: std.mem.Allocator,
+    io: std.Io,
 ) UvResult {
     _ = info;
     _ = user;
     _ = rp;
     _ = pinHash;
+
+    State.get().authenticate(a, io) catch |e| {
+        std.log.err("[my_uv]: authentication failed ({any})", .{e});
+        return UvResult.Denied;
+    };
 
     return State.get().uv_result;
 }
@@ -366,11 +363,14 @@ pub fn my_up(
     user: ?keylib.common.User,
     /// Information about the relying party (e.g., `Github (github.com)`)
     rp: ?keylib.common.RelyingParty,
+    a: std.mem.Allocator,
+    io: std.Io,
 ) UpResult {
     _ = info;
     _ = user;
+    _ = a;
 
-    std.log.info("up: {any}", .{State.get().up_result});
+    std.log.debug("[my_up]: {any}", .{State.get().up_result});
     if (State.get().up_result) |r| return r;
 
     const text = std.fmt.allocPrint(allocator, "{s} {s}", .{
@@ -382,7 +382,7 @@ pub fn my_up(
     };
     defer allocator.free(text);
 
-    const r = std.process.run(allocator, io_, .{
+    const r = std.process.run(allocator, io, .{
         .argv = &.{
             "zigenity",
             "--question",
@@ -401,7 +401,7 @@ pub fn my_up(
         allocator.free(r.stderr);
     }
 
-    std.log.info("up result: {d}", .{r.term.exited});
+    std.log.debug("up result: {d}", .{r.term.exited});
     switch (r.term.exited) {
         0 => return UpResult.Accepted,
         5 => return UpResult.Timeout,
@@ -413,34 +413,36 @@ pub fn my_read_first(
     id: ?dt.ABS64B,
     rp: ?dt.ABS128T,
     hash: ?[32]u8,
+    a: std.mem.Allocator,
+    io: std.Io,
 ) CallbackError!Credential {
-    std.log.info("my_first_read:\n  id:   {s}\n  rpId: {s}", .{
+    std.log.debug("my_first_read:\n  id:   {s}\n  rpId: {s}", .{
         if (id) |uid| uid.get() else "n.a.",
         if (rp) |rpid| rpid.get() else "n.a.",
     });
 
+    fetch_index = 0;
+    fetch_rp = null;
+    fetch_hash = null;
+    fetch_ts = std.Io.Timestamp.now(io, .real).toMilliseconds();
+
     if (rp != null or hash != null) {
-        fetch_index = 0;
         fetch_rp = rp;
         fetch_hash = hash;
-        fetch_ts = std.Io.Timestamp.now(io_, .real).toMilliseconds();
 
-        return State.get().database.?.getCredential(&State.get().database.?, if (fetch_rp) |frp| frp.get() else null, hash, &fetch_index.?) catch |e| {
-            std.log.info("No entry found: {any}", .{e});
+        const cred = State.get().database.?.getCredential(&State.get().database.?, if (fetch_rp) |frp| frp.get() else null, hash, &fetch_index.?, a) catch |e| {
+            std.log.debug("No entry found: {any}", .{e});
             fetch_index = null;
             fetch_rp = null;
             fetch_hash = null;
             fetch_ts = null;
             return error.DoesNotExist;
         };
-    } else {
-        fetch_index = 0;
-        fetch_rp = null;
-        fetch_hash = null;
-        fetch_ts = std.Io.Timestamp.now(io_, .real).toMilliseconds();
 
-        return State.get().database.?.getCredential(&State.get().database.?, null, null, &fetch_index.?) catch |e| {
-            std.log.info("No entry found: {any}", .{e});
+        return cred;
+    } else {
+        return State.get().database.?.getCredential(&State.get().database.?, null, null, &fetch_index.?, a) catch |e| {
+            std.log.debug("No entry found: {any}", .{e});
             fetch_index = null;
             fetch_rp = null;
             fetch_hash = null;
@@ -452,8 +454,13 @@ pub fn my_read_first(
     return error.DoesNotExist;
 }
 
-pub fn my_read_next() CallbackError!Credential {
-    std.log.info("my_read_next: fetch_ts {any}, fetch_index {any}, fetch_rp {any}", .{ fetch_ts, fetch_index, fetch_rp });
+pub fn my_read_next(
+    a: std.mem.Allocator,
+    io: std.Io,
+) CallbackError!Credential {
+    _ = io;
+
+    std.log.debug("my_read_next: fetch_ts {any}, fetch_index {any}, fetch_rp {any}", .{ fetch_ts, fetch_index, fetch_rp });
     if (fetch_ts == null or fetch_index == null) {
         fetch_index = null;
         fetch_rp = null;
@@ -463,8 +470,8 @@ pub fn my_read_next() CallbackError!Credential {
         return error.Other;
     }
 
-    return State.get().database.?.getCredential(&State.get().database.?, if (fetch_rp) |rp| rp.get() else null, fetch_hash, &fetch_index.?) catch |e| {
-        std.log.info("No entry found: {any}", .{e});
+    return State.get().database.?.getCredential(&State.get().database.?, if (fetch_rp) |rp| rp.get() else null, fetch_hash, &fetch_index.?, a) catch |e| {
+        std.log.debug("No entry found: {any}", .{e});
         fetch_index = null;
         fetch_rp = null;
         fetch_hash = null;
@@ -475,28 +482,49 @@ pub fn my_read_next() CallbackError!Credential {
 
 pub fn my_write(
     data: Credential,
+    a: std.mem.Allocator,
+    io: std.Io,
 ) CallbackError!void {
+    _ = a;
+    _ = io;
+
     State.get().database.?.setCredential(&State.get().database.?, data) catch {
         return error.Other;
     };
 }
 
 pub fn my_delete(
-    id: [*c]const u8,
-) callconv(.c) Error {
+    id: []const u8,
+    a: std.mem.Allocator,
+    io: std.Io,
+) CallbackError!void {
     _ = id;
-    // TODO: remove this from keylib!
+    _ = a;
+    _ = io;
 
-    return Error.Other;
+    return error.Other;
 }
 
-pub fn my_read_settings() Meta {
+pub fn my_read_settings(
+    a: std.mem.Allocator,
+    io: std.Io,
+) Meta {
+    _ = a;
+    _ = io;
+
     return Meta{
         .always_uv = true,
     };
 }
 
-pub fn my_write_settings(data: Meta) void {
+pub fn my_write_settings(
+    data: Meta,
+    a: std.mem.Allocator,
+    io: std.Io,
+) void {
+    _ = a;
+    _ = io;
+
     _ = data;
 }
 

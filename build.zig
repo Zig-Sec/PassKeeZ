@@ -24,6 +24,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const translate_c = b.addTranslateC(.{
+        .root_source_file = b.path("src/c.h"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     const dvui_dep = b.dependency(
         "dvui",
         .{
@@ -45,6 +51,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "zbor", .module = keylib_dep.module("zbor") },
                 .{ .name = "kdbx", .module = kdbx_dep.module("kdbx") },
                 .{ .name = "uuid", .module = uuid_dep.module("uuid") },
+                .{ .name = "c", .module = translate_c.createModule() },
             },
             .link_libc = true,
         }),
