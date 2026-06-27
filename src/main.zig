@@ -22,13 +22,7 @@ var fetch_rp: ?dt.ABS128T = null;
 var fetch_hash: ?[32]u8 = null;
 var fetch_ts: ?i64 = null;
 
-pub const std_options: std.Options = .{
-    .log_level = .info,
-};
-
-const c = @cImport({
-    @cInclude("sys/mman.h");
-});
+const c = @import("c");
 
 // The .polling variant is Linux-only (inotify). Unlike the threaded backends,
 // it does not spawn an internal thread; instead the caller drives event
@@ -60,7 +54,7 @@ const H = struct {
     }
 
     fn rename(_: *Watcher.Handler, src: []const u8, dst: []const u8, _: nightwatch.ObjectType) error{HandlerFailed}!void {
-        std.log.info("rename  {s}  ->  {s}\n", .{ src, dst });
+        std.log.debug("rename  {s}  ->  {s}\n", .{ src, dst });
     }
 
     // Called by the backend at arm time and after each handle_read_ready().
@@ -376,7 +370,7 @@ pub fn my_up(
     _ = user;
     _ = a;
 
-    std.log.info("[my_up]: {any}", .{State.get().up_result});
+    std.log.debug("[my_up]: {any}", .{State.get().up_result});
     if (State.get().up_result) |r| return r;
 
     const text = std.fmt.allocPrint(allocator, "{s} {s}", .{
@@ -407,7 +401,7 @@ pub fn my_up(
         allocator.free(r.stderr);
     }
 
-    std.log.info("up result: {d}", .{r.term.exited});
+    std.log.debug("up result: {d}", .{r.term.exited});
     switch (r.term.exited) {
         0 => return UpResult.Accepted,
         5 => return UpResult.Timeout,
@@ -422,7 +416,7 @@ pub fn my_read_first(
     a: std.mem.Allocator,
     io: std.Io,
 ) CallbackError!Credential {
-    std.log.info("my_first_read:\n  id:   {s}\n  rpId: {s}", .{
+    std.log.debug("my_first_read:\n  id:   {s}\n  rpId: {s}", .{
         if (id) |uid| uid.get() else "n.a.",
         if (rp) |rpid| rpid.get() else "n.a.",
     });
@@ -437,7 +431,7 @@ pub fn my_read_first(
         fetch_hash = hash;
 
         const cred = State.get().database.?.getCredential(&State.get().database.?, if (fetch_rp) |frp| frp.get() else null, hash, &fetch_index.?, a) catch |e| {
-            std.log.info("No entry found: {any}", .{e});
+            std.log.debug("No entry found: {any}", .{e});
             fetch_index = null;
             fetch_rp = null;
             fetch_hash = null;
@@ -448,7 +442,7 @@ pub fn my_read_first(
         return cred;
     } else {
         return State.get().database.?.getCredential(&State.get().database.?, null, null, &fetch_index.?, a) catch |e| {
-            std.log.info("No entry found: {any}", .{e});
+            std.log.debug("No entry found: {any}", .{e});
             fetch_index = null;
             fetch_rp = null;
             fetch_hash = null;
@@ -466,7 +460,7 @@ pub fn my_read_next(
 ) CallbackError!Credential {
     _ = io;
 
-    std.log.info("my_read_next: fetch_ts {any}, fetch_index {any}, fetch_rp {any}", .{ fetch_ts, fetch_index, fetch_rp });
+    std.log.debug("my_read_next: fetch_ts {any}, fetch_index {any}, fetch_rp {any}", .{ fetch_ts, fetch_index, fetch_rp });
     if (fetch_ts == null or fetch_index == null) {
         fetch_index = null;
         fetch_rp = null;
@@ -477,7 +471,7 @@ pub fn my_read_next(
     }
 
     return State.get().database.?.getCredential(&State.get().database.?, if (fetch_rp) |rp| rp.get() else null, fetch_hash, &fetch_index.?, a) catch |e| {
-        std.log.info("No entry found: {any}", .{e});
+        std.log.debug("No entry found: {any}", .{e});
         fetch_index = null;
         fetch_rp = null;
         fetch_hash = null;
