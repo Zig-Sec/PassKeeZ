@@ -87,7 +87,8 @@ function install_passkeez {
     cd PassKeeZ
     ../$1 build -Doptimize=ReleaseSmall
     cp zig-out/bin/passkeez /usr/local/bin/passkeez
- 
+    
+    echo "Downloading service file" 
     # Install the static files 
     #mkdir -p /usr/share/passkeez
     #cp src/static/*.png /usr/share/passkeez/
@@ -99,7 +100,8 @@ function install_passkeez {
     # systemctl --user status passkeez.service
     #cp script/passkeez.service /etc/systemd/user/passkeez.service
     mkdir -p /home/${SUDO_USER}/.local/share/systemd/user
-    curl -L -# -C - -o "/home/${SUDO_USER}/.local/share/systemd/user/passkeez.service" "https://codeberg.org/r4gus/PassKeeZ/raw/branch/${PASSKEEZ_VERSION}/script/passkeez.service"
+    rm /home/${SUDO_USER}/.local/share/systemd/user/passkeez.service
+    curl -L -# -C - -o "/home/${SUDO_USER}/.local/share/systemd/user/passkeez.service" "https://codeberg.org/r4gus/PassKeeZ/raw/branch/master/script/passkeez.service"
 }
 
 function install_zigenity {
