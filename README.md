@@ -31,6 +31,9 @@ The project currently supports only Linux due to the absence of a standardized A
 
 > [!IMPORTANT]
 > With the release of version 0.5.0, PassKeeZ uses the KDBX format for storing credentials. The advantage of using KDBX is that you can manage your passkeys using KeePass or KeePassXC (PassKeeZ uses the same format for storing passkeys as KeePassXC). If you run into issues please open an issue.
+>
+> Applications like password managers (a FIDO2 authenticator is just a fancy password manager that implements the CTAP2 spec) have to make a trade-off between confidentiality and availability. By supporting KDBX4, PassKeeZ is in a sweet-spot between those two aspects (this is of course my opinion). Users stay in full control over their credentials and can use existing applications like KeePass(XC) to manage credentials. Furthermore, we abstract away from the OS, i.e., even if someone has access to the device and can unlock it, the data stored within KDBX is still confidential (unless you use the same password for both your KDBX4 file and the user account). This is also the reason why PassKeeZ won't support biometrics. As biometrics are not suitable for deriving deterministic values (keys, seeds, etc.) one has to store the actual secret for "unlocking" the KDBX file somewhere indefinitely. This adds just unnecessary complexity.
+
 
 ## Getting Started 
 
