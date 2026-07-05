@@ -26,8 +26,11 @@ pub const std_options: std.Options = .{
     .logFn = dvui.App.logFn,
 };
 
-var gpa_instance = std.heap.GeneralPurposeAllocator(.{}){};
+var gpa_instance = std.heap.DebugAllocator(.{}){};
 const gpa = gpa_instance.allocator();
+
+var io_impl: std.Io.Threaded = undefined;
+var io_: std.Io = undefined;
 
 var orig_content_scale: f32 = 1.0;
 
@@ -78,6 +81,9 @@ const transport = struct {
 // - runs between win.begin()/win.end()
 pub fn AppInit(win: *dvui.Window) !void {
     orig_content_scale = win.content_scale;
+
+    io_impl = std.Io.Threaded.init(gpa, .{});
+    io_ = io_impl.io();
 
     //if (false) {
     //    // If you need to set a theme based on the users preferred color scheme, do it here
@@ -148,7 +154,7 @@ pub fn frame() !dvui.App.Result {
         }
     }
 
-    try loginWidget(window, uId, gpa);
+    try loginWidget(window, uId, gpa, io_);
 
     return .ok;
 }
@@ -157,6 +163,7 @@ pub fn loginWidget(
     win: *dvui.Window,
     uniqueId: dvui.Id,
     allocator: std.mem.Allocator,
+    io: std.Io,
 ) !void {
     var paned = dvui.paned(@src(), .{ .direction = .horizontal, .collapsed_size = 1200 }, .{ .expand = .both, .background = false });
 
@@ -171,12 +178,14 @@ pub fn loginWidget(
             win,
             uniqueId,
             allocator,
+            io,
         );
 
         try drawDeviceInfo(
             window,
             uniqueId,
             allocator,
+            io,
             paned,
         );
     }
@@ -193,8 +202,8 @@ pub fn loginWidget(
         }
 
         switch (menu_active) {
-            .change_password => try drawChangePassword(win, uniqueId, allocator, paned),
-            .set_password => try drawSetPassword(win, uniqueId, allocator, paned),
+            .change_password => try drawChangePassword(win, uniqueId, allocator, io, paned),
+            .set_password => try drawSetPassword(win, uniqueId, allocator, io, paned),
             .none => {},
         }
     }
@@ -206,6 +215,7 @@ fn drawSetPassword(
     win: *dvui.Window,
     uniqueId: dvui.Id,
     allocator: std.mem.Allocator,
+    io: std.Io,
     paned: *dvui.PanedWidget,
 ) !void {
     _ = allocator;
@@ -256,7 +266,7 @@ fn drawSetPassword(
             .{
                 .expand = .horizontal,
                 .gravity_y = 0.5,
-                .corner_radius = .all(0),
+                .corners = .square,
             },
         );
 
@@ -290,7 +300,7 @@ fn drawSetPassword(
             .{
                 .expand = .horizontal,
                 .gravity_y = 0.5,
-                .corner_radius = .all(0),
+                .corners = .square,
             },
         );
 
@@ -312,7 +322,7 @@ fn drawSetPassword(
     } else {
         if (dvui.button(@src(), "Set PIN", .{}, .{
             .expand = .horizontal,
-            .corner_radius = .all(0),
+            .corners = .square,
         }) or enter_pressed) blk: {
             const new = getSlice(&local.new_password);
             const new2 = getSlice(&local.verify_new_password);
@@ -338,6 +348,7 @@ fn drawSetPassword(
                     win,
                     uniqueId,
                     gpa,
+                    io,
                     null,
                     new,
                     &local.spinner_active,
@@ -358,6 +369,7 @@ fn drawChangePassword(
     win: *dvui.Window,
     uniqueId: dvui.Id,
     allocator: std.mem.Allocator,
+    io: std.Io,
     paned: *dvui.PanedWidget,
 ) !void {
     _ = allocator;
@@ -409,7 +421,7 @@ fn drawChangePassword(
             .{
                 .expand = .horizontal,
                 .gravity_y = 0.5,
-                .corner_radius = .all(0),
+                .corners = .square,
             },
         );
         // Fucus on the password entry
@@ -447,7 +459,7 @@ fn drawChangePassword(
             .{
                 .expand = .horizontal,
                 .gravity_y = 0.5,
-                .corner_radius = .all(0),
+                .corners = .square,
             },
         );
 
@@ -481,7 +493,7 @@ fn drawChangePassword(
             .{
                 .expand = .horizontal,
                 .gravity_y = 0.5,
-                .corner_radius = .all(0),
+                .corners = .square,
             },
         );
 
@@ -503,7 +515,7 @@ fn drawChangePassword(
     } else {
         if (dvui.button(@src(), "Change PIN", .{}, .{
             .expand = .horizontal,
-            .corner_radius = .all(0),
+            .corners = .square,
         }) or enter_pressed) blk: {
             const old = getSlice(&local.old_password);
             const new = getSlice(&local.new_password);
@@ -530,6 +542,7 @@ fn drawChangePassword(
                     win,
                     uniqueId,
                     gpa,
+                    io,
                     old,
                     new,
                     &local.spinner_active,
@@ -550,11 +563,13 @@ fn drawDeviceInfo(
     win: *dvui.Window,
     uniqueId: dvui.Id,
     allocator: std.mem.Allocator,
+    io: std.Io,
     paned: *dvui.PanedWidget,
 ) !void {
     _ = win;
     _ = uniqueId;
     _ = allocator;
+    _ = io;
 
     var left_alignment = dvui.Alignment.init(@src(), 0);
     defer left_alignment.deinit();
@@ -648,6 +663,7 @@ fn drawDeviceSelectorWidget(
     win: *dvui.Window,
     uniqueId: dvui.Id,
     allocator: std.mem.Allocator,
+    io: std.Io,
 ) !void {
 
     // Load list of available devices
@@ -663,6 +679,7 @@ fn drawDeviceSelectorWidget(
                 &transport.loading_transports,
                 &transport.choice,
                 allocator,
+                io,
             },
         ) catch |err| {
             dvui.log.err(
@@ -703,7 +720,7 @@ fn drawDeviceSelectorWidget(
                 .{},
                 .{
                     .gravity_y = 0.5,
-                    .corner_radius = .all(0),
+                    .corners = .square,
                     .expand = .horizontal,
                 },
             )) blk: {
@@ -742,7 +759,7 @@ fn drawDeviceSelectorWidget(
                 .{},
                 .{
                     .gravity_y = 0.5,
-                    .corner_radius = .all(0),
+                    .corners = .square,
                     .expand = .horizontal,
                 },
             );
@@ -758,7 +775,7 @@ fn drawDeviceSelectorWidget(
             .{
                 .gravity_y = 0.5,
                 .data_out = &ttout,
-                .corner_radius = .all(0),
+                .corners = .square,
             },
         )) {
             if (!transport.loading_transports) blk: {
@@ -775,6 +792,7 @@ fn drawDeviceSelectorWidget(
                         &transport.loading_transports,
                         &transport.choice,
                         allocator,
+                        io,
                     },
                 ) catch |err| {
                     dvui.log.err(
@@ -812,6 +830,7 @@ fn drawDeviceSelectorWidget(
                     uniqueId,
                     transport,
                     gpa,
+                    io,
                 },
             ) catch |err| {
                 dvui.log.info(
@@ -839,6 +858,7 @@ fn drawDeviceSelectorWidget(
                     win,
                     uniqueId,
                     gpa,
+                    io,
                 },
             ) catch |err| {
                 dvui.log.info(
@@ -872,6 +892,7 @@ fn reset(
     win: *dvui.Window,
     uniqueId: dvui.Id,
     a: std.mem.Allocator,
+    io: std.Io,
 ) void {
     _ = uniqueId;
 
@@ -880,14 +901,14 @@ fn reset(
         return;
     }
 
-    var promise = client.reset(device.?, 10000) catch |e| {
+    var promise = client.reset(device.?, io, .{ .timeout = 10000 }) catch |e| {
         std.log.err("failed to send reset command {any}", .{e});
         dvui.toast(@src(), .{ .window = win, .message = "Device reset failed" });
         return;
     };
 
     while (true) {
-        const state = promise.get(a);
+        const state = promise.get(a, io);
         defer state.deinit(a);
 
         switch (state) {
@@ -918,6 +939,7 @@ fn set_pin(
     win: *dvui.Window,
     uniqueId: dvui.Id,
     a: std.mem.Allocator,
+    io: std.Io,
     curPin: ?[]const u8,
     newPin: []const u8,
     spinner_active: *bool,
@@ -950,6 +972,7 @@ fn set_pin(
         device.?,
         pinUvAuthProtocol,
         a,
+        io,
     ) catch |e| {
         std.log.err("failed to get key agreement key ({any})", .{e});
         return;
@@ -968,12 +991,13 @@ fn set_pin(
             curPin.?,
             newPin,
             a,
+            io,
         ) catch |e| {
             std.log.err("failed to change pin: {any}", .{e});
             return;
         };
 
-        var cp_state = cpr.await(a) catch |e| {
+        var cp_state = cpr.await(a, io) catch |e| {
             std.log.err("awaiting response failed ({any})", .{e});
             return;
         };
@@ -1001,6 +1025,7 @@ fn set_pin(
             &shared_secret,
             newPin,
             a,
+            io,
         ) catch |e| {
             std.log.err("failed to set pin: {any}", .{e});
             dvui.toast(@src(), .{ .window = win, .message = "Failed to set PIN" });
@@ -1017,6 +1042,7 @@ fn get_device_info(
     uniqueId: dvui.Id,
     local: anytype,
     a: std.mem.Allocator,
+    io: std.Io,
 ) void {
     _ = win;
     _ = uniqueId;
@@ -1026,14 +1052,14 @@ fn get_device_info(
         return;
     }
 
-    var info_state_ = client.getInfo(device.?) catch |e| {
+    var info_state_ = client.getInfo(device.?, io, .{}) catch |e| {
         std.log.err("failed to obtain device information ({any})", .{e});
         closeDevice(a);
         local.choice = null;
         return;
     };
 
-    var info_state = info_state_.await(a) catch |e| {
+    var info_state = info_state_.await(a, io) catch |e| {
         std.log.err("failed to obtain device information ({any})", .{e});
         closeDevice(a);
         local.choice = null;
@@ -1084,6 +1110,7 @@ fn list_available_devices(
     loading_transports: *bool,
     choice: *?usize,
     a: std.mem.Allocator,
+    io: std.Io,
 ) void {
     defer {
         loading_transports.* = false;
@@ -1094,6 +1121,7 @@ fn list_available_devices(
 
     const t = client.Transports.enumerate(
         a,
+        io,
         .{},
     ) catch |e| {
         std.log.err("enumerating available devices failed ({any})", .{e});

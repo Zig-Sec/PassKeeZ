@@ -17,8 +17,8 @@
             .hash = "keylib-0.10.0-alpha-mbYjk-nhCwBZx-i78h3bJf6bv_b2_lk_Ily_HiiN-HoQ",
         },
         .dvui = .{
-            .url = "git+https://github.com/david-vanderson/dvui#5f3f394d78382c434d7c5b152ce476833db542de",
-            .hash = "dvui-0.5.0-dev-AQFJmVEc9gBhhgP3p8dN09veUHczWd-6-wo22tahQFdJ",
+            .url = "git+https://github.com/david-vanderson/dvui#3d2555337261743637f50375b2ac7bb1cf6b0510",
+            .hash = "dvui-0.5.0-dev-AQFJmV1i-gBHqte8mSi-IOJu02dp7b8ZNIDPKEpWMt7-",
         },
         .nightwatch = .{
             .url = "git+https://github.com/neurocyte/nightwatch#cbb9baab0d2ed66e9a0859e28c4a6a2e61a47600",
