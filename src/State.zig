@@ -7,11 +7,15 @@ const UvResult = keylib.ctap.authenticator.callbacks.UvResult;
 const i18n = @import("i18n.zig");
 const misc = @import("database/misc.zig");
 
+const PublicKeyCredentialParameters = keylib.common.PublicKeyCredentialParameters;
+
 conf: Config,
 home: []const u8,
 
 conf_abs_path: []const u8,
 db_abs_path: []const u8,
+
+algorithms: []const PublicKeyCredentialParameters,
 
 /// The open database
 ///
@@ -26,6 +30,17 @@ ts: ?i64 = null,
 
 const tout1: i64 = 10; // seconds
 const tout2: i64 = 60; // seconds
+
+const algs_minimal: []const PublicKeyCredentialParameters = &.{
+    .{ .alg = .Es256 },
+};
+
+const algs_mldsa: []const PublicKeyCredentialParameters = &.{
+    .{ .alg = .@"ML-DSA-87" },
+    .{ .alg = .@"ML-DSA-65" },
+    .{ .alg = .@"ML-DSA-44" },
+    .{ .alg = .Es256 },
+};
 
 var s: ?@This() = null;
 
@@ -49,11 +64,13 @@ pub fn init(a: std.mem.Allocator, io: std.Io, home_: []const u8) !void {
         .home = try a.dupe(u8, home_),
         .conf_abs_path = try confPathAlloc(a, home_),
         .db_abs_path = try dbPathAlloc(a, home_, conf.db_path),
+        .algorithms = if (conf.mldsa) algs_mldsa else algs_minimal,
     };
 
     std.log.info("initialized configuration", .{});
     std.log.info("conf path: {s}", .{s.?.conf_abs_path});
     std.log.info("db path: {s}", .{s.?.db_abs_path});
+    std.log.info("algs: {any}", .{s.?.algorithms});
 }
 
 pub fn deinit(a: std.mem.Allocator) void {
@@ -90,6 +107,7 @@ pub fn reloadConfig(self: *@This(), a: std.mem.Allocator, io: std.Io) !void {
     // Assign new config
     self.conf = conf;
     self.db_abs_path = db_abs_path;
+    self.algorithms = if (self.conf.mldsa) algs_mldsa else algs_minimal;
 }
 
 pub fn deinitDb(self: *@This()) void {

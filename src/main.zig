@@ -158,12 +158,7 @@ pub fn main(init: std.process.Init) !void {
             // The transports your authenticator supports.
             .transports = &.{.usb},
             // The algorithms you support.
-            .algorithms = &.{
-                .{ .alg = .@"ML-DSA-87" },
-                .{ .alg = .@"ML-DSA-65" },
-                .{ .alg = .@"ML-DSA-44" },
-                .{ .alg = .Es256 },
-            },
+            .algorithms = State.get().algorithms,
             .firmwareVersion = 0x0036,
             .remainingDiscoverableCredentials = 100,
         },
@@ -217,6 +212,7 @@ pub fn main(init: std.process.Init) !void {
             State.get().reloadConfig(allocator, init.io) catch |e| {
                 std.log.err("reloading configuration failed ({any})", .{e});
             };
+            auth.settings.algorithms = State.get().algorithms;
 
             conf_watcher.watch(State.get().conf_abs_path) catch |e| {
                 std.log.err("rearming configuration file watcher failed ({any})", .{e});
