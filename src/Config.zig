@@ -6,6 +6,7 @@ pub const config_name = "config.json";
 db_path: []const u8 = "",
 lang: []const u8 = "english",
 mldsa: bool = false,
+mlock: bool = false,
 
 pub fn load(a: std.mem.Allocator, io: std.Io, home: []const u8) !@This() {
     var file = openOrCreate(a, io, home) catch |e| {

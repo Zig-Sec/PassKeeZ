@@ -30,8 +30,7 @@ const c = @import("c");
 // whenever data is available. The handler vtable requires an extra
 // wait_readable callback that the backend calls to notify the handler that it
 // should re-arm the fd in its polling loop before the next handle_read_ready().
-//const Watcher = nightwatch.Create(.polling);
-const Watcher = nightwatch.Default;
+const Watcher = nightwatch.Create(.polling);
 
 // On Ubuntu, saving a file is registered as: `close`, `delete`, i.e., we
 // have to act on delete and "rearm" the watcher afterwards.
@@ -39,16 +38,21 @@ var rearm_conf_watcher: bool = false;
 const H = struct {
     handler: Watcher.Handler,
 
-    const vtable = Watcher.Handler.VTable{ .change = change, .rename = rename };
+    const vtable = Watcher.Handler.VTable{
+        .change = change,
+        .rename = rename,
+        .wait_readable = wait_readable,
+    };
 
     fn change(_: *Watcher.Handler, path: []const u8, event: nightwatch.EventType, _: nightwatch.ObjectType) error{HandlerFailed}!void {
         _ = path;
         //std.debug.print("rename  {any}  ->  {s}\n", .{ event, path });
 
         if (event == .deleted) {
-            // As the watcher runs in a different thread, we just set the
-            // flag and handle reloading the configuration in the main loop
-            // to prevent data races.
+            // The polling watcher delivers events synchronously from the main
+            // loop (see below), but we still defer the actual reload: we just
+            // set the flag here and reload the configuration at the top of the
+            // main loop, keeping the reload logic in a single place.
             rearm_conf_watcher = true;
         }
     }
@@ -68,9 +72,6 @@ const H = struct {
 pub fn main(init: std.process.Init) !void {
     defer _ = gpa.detectLeaks();
 
-    // Do NOT swap out memory.
-    _ = c.mlockall(c.MCL_CURRENT | c.MCL_FUTURE);
-
     // We need the path to the home folder.
     // TODO: add command line argument as backup
     const home = init.minimal.environ.getAlloc(allocator, "HOME") catch |e| {
@@ -86,6 +87,14 @@ pub fn main(init: std.process.Init) !void {
     };
     defer State.deinit(allocator);
 
+    if (State.get().conf.mlock) {
+        // Do NOT swap out memory.
+        // If you run into issues, make sure to adjust the limit as neccessary, e.g.:
+        //   `$ ulimit -Sl 65536; passkeez`
+        _ = c.mlockall(c.MCL_CURRENT | c.MCL_FUTURE);
+        std.log.info("mlock enabled", .{});
+    }
+
     // Setup file watcher for configuration file
     var h = H{ .handler = .{ .vtable = &H.vtable } };
     var conf_watcher = try Watcher.init(init.io, allocator, &h.handler);
@@ -94,9 +103,9 @@ pub fn main(init: std.process.Init) !void {
         std.log.err("start watching configuration file failed ({any})", .{e});
         std.process.exit(1);
     };
-    //var pfd = [_]std.posix.pollfd{
-    //    .{ .fd = conf_watcher.poll_fd(), .events = std.posix.POLL.IN, .revents = 0 },
-    //};
+    var pfd = [_]std.posix.pollfd{
+        .{ .fd = conf_watcher.poll_fd(), .events = std.posix.POLL.IN, .revents = 0 },
+    };
 
     // The Auth struct is the most important part of your authenticator. It defines
     // its capabilities and behavior.
@@ -218,10 +227,26 @@ pub fn main(init: std.process.Init) !void {
                 std.log.err("rearming configuration file watcher failed ({any})", .{e});
             };
 
+            if (State.get().conf.mlock) {
+                _ = c.mlockall(c.MCL_CURRENT | c.MCL_FUTURE);
+                std.log.info("mlock enabled", .{});
+            } else {
+                _ = c.munlockall();
+                std.log.info("mlock disabled", .{});
+            }
+
             rearm_conf_watcher = false;
         }
 
         State.get().update(init.io);
+
+        pfd[0].revents = 0;
+        const nready = std.posix.poll(&pfd, 0) catch 0;
+        if (nready > 0 and (pfd[0].revents & std.posix.POLL.IN) != 0) {
+            conf_watcher.handle_read_ready() catch |e| {
+                std.log.err("watching configuration file failed ({any})", .{e});
+            };
+        }
 
         // We read in usb packets with a size of 64 bytes.
         var buffer: [64]u8 = .{0} ** 64;
