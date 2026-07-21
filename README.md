@@ -13,7 +13,7 @@ PassKeeZ is a Passkey (FIDO2) compatible authenticator for Linux based on [keyli
 | Version | Command |
 |:--------|:--------|
 | 0.6.3   | `sudo bash -c "$(curl -fsSL https://codeberg.org/r4gus/PassKeeZ/raw/branch/master/script/install-linux.sh)" install-linux.sh --vpasskeez 0.6.3 --vzig 0.15.2 --vzigenity 0.7.1`|
-| 0.7.1   | `sudo bash -c "$(curl -fsSL https://codeberg.org/r4gus/PassKeeZ/raw/branch/master/script/install-linux.sh)"` |
+| 0.7.2   | `sudo bash -c "$(curl -fsSL https://codeberg.org/r4gus/PassKeeZ/raw/branch/master/script/install-linux.sh)"` |
 
 The project currently supports only Linux due to the absence of a standardized API for interprocess communication (IPC) between the client and authenticator. As a workaround, platform authenticators on Linux act as virtual USB HID devices utilizing uhid. However, extending this functionality to other platforms remains unexplored as I haven't had the opportunity to investigate the equivalent mechanisms elsewhere.
 
