@@ -1,6 +1,6 @@
 .{
     .name = .passkeez,
-    .version = "0.7.2",
+    .version = "0.7.3",
     .minimum_zig_version = "0.16.0",
     .fingerprint = 0xdd1692d15d21a6f6,
     .dependencies = .{
@@ -9,12 +9,12 @@
             .hash = "uuid-0.5.0-oOieIQx-AABtc9U3ihv_bf9pZAYoKp4UMsNFHBr-cn-w",
         },
         .kdbx = .{
-            .url = "https://codeberg.org/r4gus/kdbx/archive/0.5.0.tar.gz",
-            .hash = "kdbx-0.5.0-eJXZBEioEwBm8vW0-QYTGr29XL5GmMv9XHtxvRvord4L",
+            .url = "https://codeberg.org/r4gus/kdbx/archive/0.5.1.tar.gz",
+            .hash = "kdbx-0.5.1-eJXZBAXXCwAnDx8nBOLxfYx-r7W6qzU9m0JZch-frmD5",
         },
         .keylib = .{
-            .url = "git+https://codeberg.org/r4gus/keylib?ref=web#8a47083477ed9192811f1ded85388323c4c9f825",
-            .hash = "keylib-0.10.0-alpha-mbYjk-nhCwBZx-i78h3bJf6bv_b2_lk_Ily_HiiN-HoQ",
+            .url = "https://codeberg.org/r4gus/keylib/archive/0.10.0.tar.gz",
+            .hash = "keylib-0.10.0-mbYjk-PhCwBl-BdAudT7ioOhe-64Ki9c0HtgO-0ytda4",
         },
         .dvui = .{
             .url = "git+https://github.com/david-vanderson/dvui#3d2555337261743637f50375b2ac7bb1cf6b0510",

@@ -442,6 +442,11 @@ pub fn my_read_first(
         if (rp) |rpid| rpid.get() else "n.a.",
     });
 
+    if (State.get().database == null) {
+        std.log.err("[my_read_first]: database not initialized", .{});
+        return error.Other;
+    }
+
     fetch_index = 0;
     fetch_rp = null;
     fetch_hash = null;
@@ -481,6 +486,11 @@ pub fn my_read_next(
 ) CallbackError!Credential {
     _ = io;
 
+    if (State.get().database == null) {
+        std.log.err("[my_read_next]: database not initialized", .{});
+        return error.Other;
+    }
+
     std.log.debug("my_read_next: fetch_ts {any}, fetch_index {any}, fetch_rp {any}", .{ fetch_ts, fetch_index, fetch_rp });
     if (fetch_ts == null or fetch_index == null) {
         fetch_index = null;
@@ -508,6 +518,11 @@ pub fn my_write(
 ) CallbackError!void {
     _ = a;
     _ = io;
+
+    if (State.get().database == null) {
+        std.log.err("[my_write]: database not initialized", .{});
+        return error.Other;
+    }
 
     State.get().database.?.setCredential(&State.get().database.?, data) catch {
         return error.Other;
