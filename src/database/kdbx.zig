@@ -141,7 +141,7 @@ fn getCredential(
 
     const grp = db.body.root.getGroupByName("Passkeys") orelse return error.DatabaseError;
     while (grp.entries.items.len > idx.*) {
-        const entry = grp.entries.items[idx.*];
+        const entry = &grp.entries.items[idx.*];
         idx.* += 1;
 
         if (!entry.isValidKeePassXCPasskey()) continue;
@@ -149,7 +149,7 @@ fn getCredential(
         if (rp_id) |rpId| {
             if (std.mem.eql(u8, entry.get("KPEX_PASSKEY_RELYING_PARTY").?, rpId)) {
                 return credentialFromEntry(
-                    &entry,
+                    entry,
                     self.allocator,
                     aexternal,
                 ) catch |e| {
@@ -164,7 +164,7 @@ fn getCredential(
 
             if (std.mem.eql(u8, &hash, &digest)) {
                 return credentialFromEntry(
-                    &entry,
+                    entry,
                     self.allocator,
                     aexternal,
                 ) catch |e| {
@@ -174,7 +174,7 @@ fn getCredential(
             }
         } else {
             return credentialFromEntry(
-                &entry,
+                entry,
                 self.allocator,
                 aexternal,
             ) catch |e| {
@@ -394,6 +394,52 @@ pub fn createDialog(allocator: std.mem.Allocator, io: std.Io, path: []const u8, 
     }
 }
 
+//fn fixCredential(
+//    entry: *kdbx.Entry,
+//    allocator: std.mem.Allocator,
+//    io: std.Io,
+//) !bool {
+//    // we checked that both are not null before
+//    const cred_id = entry.get("KPEX_PASSKEY_CREDENTIAL_ID").?;
+//    const user_handle = entry.get("KPEX_PASSKEY_USER_HANDLE").?;
+//
+//    _ = std.base64.url_safe_no_pad.Decoder.calcSizeForSlice(cred_id) catch {
+//        var cred_id_new = std.Io.Writer.Allocating.init(allocator);
+//        defer cred_id_new.deinit();
+//        try writeBase64Url(&cred_id_new.writer, cred_id, allocator);
+//        try entry.set(io, "KPEX_PASSKEY_CREDENTIAL_ID", cred_id_new.written(), true);
+//
+//        // #################################################################
+//        const l = std.base64.standard.Decoder.calcSizeForSlice(user_handle) catch return true;
+//        const uid_ = try allocator.alloc(u8, l);
+//        defer allocator.free(uid_);
+//        try std.base64.standard.Decoder.decode(uid_, user_handle);
+//
+//        var uid = std.Io.Writer.Allocating.init(allocator);
+//        defer uid.deinit();
+//        try writeBase64Url(&uid.writer, uid_, allocator);
+//
+//        try entry.set(io, "KPEX_PASSKEY_USER_HANDLE", uid.written(), true);
+//
+//        // #################################################################
+//
+//        return true;
+//    };
+//
+//    return false;
+//}
+//
+//pub fn writeBase64Url(out: *std.Io.Writer, in: []const u8, allocator: std.mem.Allocator) !void {
+//    const l = std.base64.url_safe_no_pad.Encoder.calcSize(in.len);
+//    const m = try allocator.alloc(u8, l);
+//    defer {
+//        std.crypto.secureZero(u8, m);
+//        allocator.free(m);
+//    }
+//    _ = std.base64.url_safe_no_pad.Encoder.encode(m, in);
+//    try out.writeAll(m);
+//}
+
 fn credentialFromEntry(
     entry: *const kdbx.Entry,
     allocator: std.mem.Allocator,
@@ -419,16 +465,44 @@ fn credentialFromEntry(
     const user_handle = entry.get("KPEX_PASSKEY_USER_HANDLE").?;
     const rp_id = entry.get("KPEX_PASSKEY_RELYING_PARTY").?;
 
-    const l = try std.base64.standard.Decoder.calcSizeForSlice(user_handle);
+    var url_safe: bool = false;
+    var l = std.base64.standard.Decoder.calcSizeForSlice(user_handle) catch blk: {
+        const l = try std.base64.url_safe_no_pad.Decoder.calcSizeForSlice(user_handle);
+        url_safe = true;
+        break :blk l;
+    };
+
     const uid = try allocator.alloc(u8, l);
     defer {
         std.crypto.secureZero(u8, uid);
         allocator.free(uid);
     }
-    try std.base64.standard.Decoder.decode(uid, user_handle);
+
+    if (url_safe) {
+        try std.base64.url_safe_no_pad.Decoder.decode(uid, user_handle);
+    } else {
+        try std.base64.standard.Decoder.decode(uid, user_handle);
+    }
+
+    const @"2026-08-07 10:30 UTC (KDBX time)" = 63921655417;
+
+    const cid = if (entry.times.creation_time < @"2026-08-07 10:30 UTC (KDBX time)") blk: {
+        std.log.debug("old credential with cred_id: {x}", .{cred_id});
+        break :blk try allocator.dupe(u8, cred_id);
+    } else blk: {
+        l = try std.base64.url_safe_no_pad.Decoder.calcSizeForSlice(cred_id);
+        const cred_id_ = try allocator.alloc(u8, l);
+        try std.base64.url_safe_no_pad.Decoder.decode(cred_id_, cred_id);
+        std.log.debug("new credential with cred_id: {x}", .{cred_id_});
+        break :blk cred_id_;
+    };
+    defer {
+        std.crypto.secureZero(u8, cid);
+        allocator.free(cid);
+    }
 
     return .{
-        .id = (try keylib.common.dt.ABS64B.fromSlice(cred_id)).?,
+        .id = (try keylib.common.dt.ABS64B.fromSlice(cid)).?,
         .user = try keylib.common.User.new(uid, user_name, user_name),
         .rp = try keylib.common.RelyingParty.new(rp_id, null),
         .sign_count = 0,
