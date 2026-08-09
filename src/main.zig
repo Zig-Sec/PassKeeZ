@@ -371,7 +371,8 @@ pub fn my_uv(
 
     State.get().authenticate(a, io) catch |e| {
         std.log.err("[my_uv]: authentication failed ({any})", .{e});
-        return UvResult.Denied;
+
+        return if (e == error.RejectedByUser) UvResult.Timeout else UvResult.Denied;
     };
 
     return State.get().uv_result;

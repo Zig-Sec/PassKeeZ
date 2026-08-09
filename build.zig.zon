@@ -13,8 +13,8 @@
             .hash = "kdbx-0.5.1-eJXZBC3ZCwCnA0j5k45FUpCXl38x2XQGKHfGb3YXpu1q",
         },
         .keylib = .{
-            .url = "https://codeberg.org/r4gus/keylib/archive/0.10.1.tar.gz",
-            .hash = "keylib-0.10.1-mbYjk1XiCwCQ6dzQaxQWxe40EUbMWNoXAxp-FVpZM0qS",
+            .url = "https://codeberg.org/r4gus/keylib/archive/0.10.2.tar.gz",
+            .hash = "keylib-0.10.2-mbYjkwfjCwA5w8dz0eZqMlOw6UxoR3h1mlnAj2UVVMxt",
         },
         .dvui = .{
             .url = "git+https://github.com/david-vanderson/dvui#3d2555337261743637f50375b2ac7bb1cf6b0510",

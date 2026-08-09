@@ -296,6 +296,7 @@ pub fn authenticate(self: *@This(), a: std.mem.Allocator, io: std.Io) !void {
                 return;
             },
             else => {
+                std.log.info("uv rejected by user", .{});
                 return error.RejectedByUser;
             },
         }
