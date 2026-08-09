@@ -502,7 +502,7 @@ fn credentialFromEntry(
     }
 
     return .{
-        .id = (try keylib.common.dt.ABS64B.fromSlice(cid)).?,
+        .id = (try keylib.common.dt.ABS128B.fromSlice(cid)).?,
         .user = try keylib.common.User.new(uid, user_name, user_name),
         .rp = try keylib.common.RelyingParty.new(rp_id, null),
         .sign_count = 0,
