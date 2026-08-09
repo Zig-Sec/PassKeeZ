@@ -4,6 +4,8 @@
 
 PassKeeZ is a Passkey (FIDO2) compatible authenticator for Linux based on [keylib](https://codeberg.org/r4gus/keylib).
 
+Since version `0.7.4` PassKeeZ is fully compatible with [KeePassDX](https://www.keepassdx.com) for android, i.e., by synchronizing your KDBX-database between your Linux machine and your Android device (e.g., by using [Syncthing](https://syncthing.net)), passkeys created with PassKeeZ are also available with KeePassDX and vice versa. For more info read the [wiki](https://codeberg.org/r4gus/PassKeeZ/wiki/Cross-platform+passkey+usage.-).
+
 **To get started, please visit the [Wiki](https://codeberg.org/r4gus/PassKeeZ/wiki)**. The video below shows the full installation via the installer script.
 
 [![Installing PassKeeZ Video](https://img.youtube.com/vi/_Z2yj9kszvU/0.jpg)](https://www.youtube.com/watch?v=_Z2yj9kszvU)
@@ -13,9 +15,9 @@ PassKeeZ is a Passkey (FIDO2) compatible authenticator for Linux based on [keyli
 | Version | Command |
 |:--------|:--------|
 | 0.6.3   | `sudo bash -c "$(curl -fsSL https://codeberg.org/r4gus/PassKeeZ/raw/branch/master/script/install-linux.sh)" install-linux.sh --vpasskeez 0.6.3 --vzig 0.15.2 --vzigenity 0.7.1`|
-| 0.7.3   | `sudo bash -c "$(curl -fsSL https://codeberg.org/r4gus/PassKeeZ/raw/branch/master/script/install-linux.sh)"` |
+| 0.7.4   | `sudo bash -c "$(curl -fsSL https://codeberg.org/r4gus/PassKeeZ/raw/branch/master/script/install-linux.sh)"` |
 
-The project currently supports only Linux due to the absence of a standardized API for interprocess communication (IPC) between the client and authenticator. As a workaround, platform authenticators on Linux act as virtual USB HID devices utilizing uhid. However, extending this functionality to other platforms remains unexplored as I haven't had the opportunity to investigate the equivalent mechanisms elsewhere.
+**Browsers**
 
 | Browser | Supported? | Tested version| Notes |
 |:-------:|:----------:|:-------------:|:-----:|
@@ -24,16 +26,14 @@ The project currently supports only Linux due to the absence of a standardized A
 | Firefox | &#9989; | 122.0 (64-bit) |  |
 | Opera | &#9989; | version: 105.0.4970.16 chromium: 119.0.6045.159 | |
 
-> [!NOTE]
-> All tests were conducted using passkey for Github.
-
 > [!IMPORTANT]
 > Browsers running in sandboxed environments might not be able to communicate with the authenticator out of the box (e.g. when installing browsers with the Ubuntu App Center).
 
 ## Features
 
 * Works with all services that support Passkeys.
-* Store your Passkeys (just a private key + related data) in a local, encrypted database. 
+* Store your Passkeys (just a private key + related data) in a local, encrypted database.
+* Compatible with other KeePass applications, including [KeePassXC](https://keepassxc.org) and [KeePassDX](https://www.keepassdx.com)
 * Constant sign-counter, i.e. you can safely sync your credentials/passkeys between devices.
 
 > [!IMPORTANT]

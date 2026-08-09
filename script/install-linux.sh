@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PASSKEEZ_VERSION="0.7.3"
+PASSKEEZ_VERSION="0.7.4"
 ZIGENITY_VERSION="0.8.0"
 ZIG_VERSION="0.16.0"
 
@@ -257,6 +257,12 @@ if [ "$MODE" = "Installer" ]; then
     echo -e "    ${YELLOW}systemctl --user disable passkeez.service${NC}"
     echo "For further details visit https://codeberg.org/r4gus/PassKeeZ/wiki"
     echo -e "${YELLOW}If this is the first time running this script, please reboot...${NC}"
+    echo -e ""
+    echo -e "${YELLOW}Notes for 0.7.4${NC}"
+    echo -e "Since version 0.7.4 PassKeeZ is compatible with KeePassDX. This means you"
+    echo -e "can now use your passkeys on Android if you synchronize your KDBX database."
+    echo -e "Be aware that you need to re-register your passkeys if they have been created"
+    echo -e "before version 0.7.4!"
 else
     echo "Uninstalling PassKeeZ..."
     echo -e "${YELLOW}removing${NC} passkeez"
