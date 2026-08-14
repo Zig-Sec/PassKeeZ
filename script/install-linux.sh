@@ -219,6 +219,7 @@ if [ "$MODE" = "Installer" ]; then
     check_dependencies $PKG $ARCH
 
     dir=$(mktemp -d)
+    echo "temporary build and install directory: '$dir'"
 
     echo "Downloading Zig..."
     zig=$(download_zig "$dir")
