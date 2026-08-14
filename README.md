@@ -10,7 +10,7 @@ Since version `0.7.4` PassKeeZ is fully compatible with [KeePassDX](https://www.
 
 [![Installing PassKeeZ Video](https://img.youtube.com/vi/_Z2yj9kszvU/0.jpg)](https://www.youtube.com/watch?v=_Z2yj9kszvU)
 
-**Quick Install**
+**Quick Install** (For lazy people. Running random scripts from the internet might not always be a good idea...)
 
 | Version | Command |
 |:--------|:--------|
