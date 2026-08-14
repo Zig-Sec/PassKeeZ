@@ -39,7 +39,8 @@ function get_package_manager {
 }
 
 function download_zig {
-    cd /tmp
+    cd $1
+
     sub=$(ls | grep "zig-")
     case "${ZIG_VERSION}" in
         "0.14.0"|"0.14.1")
@@ -78,12 +79,10 @@ function check_dependencies {
 }
 
 function install_passkeez {
-    cd /tmp
+    cd "$2"
 
-    # Install the application
-    if [ ! -d "./PassKeeZ" ]; then
-        git clone https://codeberg.org/r4gus/PassKeeZ --branch $PASSKEEZ_VERSION
-    fi
+    git clone https://codeberg.org/r4gus/PassKeeZ --branch $PASSKEEZ_VERSION
+
     cd PassKeeZ
     ../$1 build -Doptimize=ReleaseSmall
     cp zig-out/bin/passkeez /usr/local/bin/passkeez
@@ -105,11 +104,9 @@ function install_passkeez {
 }
 
 function install_zigenity {
-    cd /tmp
+    cd "$2"
 
-    if [ ! -d "./zigenity" ]; then
-        git clone https://codeberg.org/r4gus/zigenity --branch $ZIGENITY_VERSION
-    fi
+    git clone https://codeberg.org/r4gus/zigenity --branch $ZIGENITY_VERSION
 
     cd zigenity
     ../$1 build -Doptimize=ReleaseSmall
@@ -221,16 +218,18 @@ if [ "$MODE" = "Installer" ]; then
     echo "Checking dependencies... "
     check_dependencies $PKG $ARCH
 
+    dir=$(mktemp -d)
+
     echo "Downloading Zig..."
-    zig=$(download_zig)
+    zig=$(download_zig "$dir")
     echo -e "${GREEN}OK${NC}"
 
     echo "Installing PassKeeZ... "
-    install_passkeez $zig
+    install_passkeez $zig "$dir"
     echo -e "${GREEN}OK${NC}"
 
     echo "Installing zigenity... "
-    install_zigenity $zig
+    install_zigenity $zig "$dir"
     echo -e "${GREEN}OK${NC}"
 
     echo "Checking configuration folder... "
@@ -240,6 +239,8 @@ if [ "$MODE" = "Installer" ]; then
     echo "Configuring... "
     postinst
     echo -e "${GREEN}OK${NC}"
+
+    rm -rf $dir
 
     echo "Enabling PassKeeZ service..."
     systemctl --user --machine=${SUDO_USER}@ enable passkeez.service || true
