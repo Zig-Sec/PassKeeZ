@@ -30,8 +30,6 @@
         "build.zig.zon",
         "linux",
         "README.md",
-        "script",
         "src",
-        "static",
     },
 }
