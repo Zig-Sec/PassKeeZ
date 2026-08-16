@@ -6,11 +6,14 @@ PassKeeZ is a Passkey (FIDO2) compatible authenticator for Linux based on [keyli
 
 Since version `0.7.4` PassKeeZ is fully compatible with [KeePassDX](https://www.keepassdx.com) for android, i.e., by synchronizing your KDBX-database between your Linux machine and your Android device (e.g., by using [Syncthing](https://syncthing.net)), passkeys created with PassKeeZ are also available with KeePassDX and vice versa. For more info read the [wiki](https://codeberg.org/r4gus/PassKeeZ/wiki/Cross-platform+passkey+usage.-).
 
+> [!IMPORTANT]
+> If you like this project, you can contribute in many forms, e.g., if you know how to package software for different distros you can help with making the installation process better.
+
 **To get started, please visit the [Wiki](https://codeberg.org/r4gus/PassKeeZ/wiki)**. The video below shows the full installation via the installer script.
 
 [![Installing PassKeeZ Video](https://img.youtube.com/vi/_Z2yj9kszvU/0.jpg)](https://www.youtube.com/watch?v=_Z2yj9kszvU)
 
-**Quick Install** (For lazy people. Running random scripts from the internet might not always be a good idea...)
+**Quick Install** (For "lazy" people. If in doubt please read the script before running it.)
 
 | Version | Command |
 |:--------|:--------|
