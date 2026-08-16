@@ -1,0 +1,5 @@
+Contact: mailto:security@thesugar.de
+Expires: 2028-08-16T12:32:00.000Z
+Preferred-Languages: en, de
+Canonical: https://codeberg.org/r4gus/PassKeeZ/raw/branch/master/.well-known/security.txt
+
