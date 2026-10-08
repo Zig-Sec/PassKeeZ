@@ -33,16 +33,19 @@ pub fn createFile(io: std.Io, path: []const u8, home: []const u8) !std.Io.File {
         defer home_dir.close(io);
         const file = try home_dir.createFile(io, path[2..], .{
             .exclusive = true,
+            .read = true,
         });
         break :blk file;
     } else if (path.len >= 1 and path[0] == '/') blk: {
         const file = try std.Io.Dir.createFileAbsolute(io, path[0..], .{
             .exclusive = true,
+            .read = true,
         });
         break :blk file;
     } else blk: {
         const file = try std.Io.Dir.cwd().createFile(io, path, .{
             .exclusive = true,
+            .read = true,
         });
         break :blk file;
     };
