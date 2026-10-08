@@ -2,9 +2,10 @@ const std = @import("std");
 
 pub const config_dir_name = ".passkeez";
 pub const config_name = "config.json";
+pub const default_db_path = "~/" ++ config_dir_name ++ "/db.kdbx";
 
 /// Path to the .kdbx database
-db_path: []const u8 = "",
+db_path: []const u8 = default_db_path,
 /// Language
 lang: []const u8 = "english",
 /// MLDSA signature algorithm support (TODO: WIP)
@@ -36,12 +37,27 @@ pub fn load(a: std.mem.Allocator, io: std.Io, home: []const u8) !@This() {
     const mem = try reader.interface.readAlloc(a, try file.length(io));
     defer a.free(mem);
 
-    return try std.json.parseFromSliceLeaky(
+    const parsed = try std.json.parseFromSlice(
         @This(),
         a,
         mem,
         .{ .allocate = .alloc_always },
     );
+    defer parsed.deinit();
+
+    var conf = parsed.value;
+    const empty_db_path = conf.db_path.len == 0;
+    // Omitted JSON fields use static defaults, which deinit must not free.
+    conf.db_path = try a.dupe(u8, if (empty_db_path) default_db_path else conf.db_path);
+    errdefer a.free(conf.db_path);
+    conf.lang = try a.dupe(u8, conf.lang);
+    errdefer a.free(conf.lang);
+
+    if (empty_db_path) {
+        try conf.write(file, io);
+    }
+
+    return conf;
 }
 
 pub fn openOrCreate(a: std.mem.Allocator, io: std.Io, home_: []const u8) !std.Io.File {
@@ -59,7 +75,8 @@ pub fn openOrCreate(a: std.mem.Allocator, io: std.Io, home_: []const u8) !std.Io
         io,
         config_name,
         .{ .mode = .read_write },
-    ) catch blk: {
+    ) catch |e| blk: {
+        if (e != error.FileNotFound) return e;
         const f = try conf_dir.createFile(
             io,
             config_name,
@@ -71,20 +88,22 @@ pub fn openOrCreate(a: std.mem.Allocator, io: std.Io, home_: []const u8) !std.Io
     errdefer f.close(io);
 
     if (created) {
-        var writer = f.writer(io, &.{});
-
         const x = @This(){};
-        try std.json.Stringify.value(
-            x,
-            .{ .whitespace = .indent_2 },
-            &writer.interface,
-        );
-        try writer.interface.flush();
-
-        try writer.seekTo(0);
+        try x.write(f, io);
     }
 
     return f;
+}
+
+fn write(self: *const @This(), file: std.Io.File, io: std.Io) !void {
+    var writer = file.writer(io, &.{});
+    try std.json.Stringify.value(
+        self.*,
+        .{ .whitespace = .indent_2 },
+        &writer.interface,
+    );
+    try writer.interface.flush();
+    try file.setLength(io, writer.pos);
 }
 
 pub fn deinit(self: *const @This(), a: std.mem.Allocator) void {
