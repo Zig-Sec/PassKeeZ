@@ -158,7 +158,7 @@ fn getCredential(
                 };
             }
         } else if (rp_id_hash) |hash| {
-            var digest: [32]u8 = .{0} ** 32;
+            var digest: [32]u8 = @splat(0);
             const url = entry.get("KPEX_PASSKEY_RELYING_PARTY").?;
             std.crypto.hash.sha2.Sha256.hash(url, &digest, .{});
 

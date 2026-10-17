@@ -144,7 +144,7 @@ pub fn enumerateRPsBegin(auth: *keylib.ctap.authenticator.Auth, req: *const Requ
     state.i = std.Io.Timestamp.now(auth.io, .real).toMilliseconds();
 
     const rp = state.rps.?.swapRemove(0);
-    var digest: [32]u8 = .{0} ** 32;
+    var digest: [32]u8 = @splat(0);
     std.crypto.hash.sha2.Sha256.hash(rp.id.get(), &digest, .{});
 
     return .{
@@ -162,7 +162,7 @@ pub fn enumerateRPsGetNextRP(status: *keylib.ctap.StatusCodes, io: std.Io, state
         return .{};
     }
 
-    var digest: [32]u8 = .{0} ** 32;
+    var digest: [32]u8 = @splat(0);
     std.crypto.hash.sha2.Sha256.hash(rp.?.id.get(), &digest, .{});
 
     return .{
@@ -263,7 +263,7 @@ pub fn enumerateCredentialsBegin(auth: *keylib.ctap.authenticator.Auth, req: *co
         return .{};
     }
     if (auth.token.rp_id) |rp_id| {
-        var digest: [32]u8 = .{0} ** 32;
+        var digest: [32]u8 = @splat(0);
         std.crypto.hash.sha2.Sha256.hash(rp_id.get(), &digest, .{});
         if (!std.mem.eql(u8, &digest, &req.subCommandParams.?.rpIDHash.?)) {
             status.* = .ctap2_err_pin_auth_invalid;

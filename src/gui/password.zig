@@ -17,8 +17,8 @@ pub fn drawSetPassword(
     _ = paned;
 
     const local = struct {
-        var new_password: [64]u8 = .{0} ** 64;
-        var verify_new_password: [64]u8 = .{0} ** 64;
+        var new_password: [64]u8 = @splat(0);
+        var verify_new_password: [64]u8 = @splat(0);
         var spinner_active: bool = false;
     };
 
@@ -110,7 +110,7 @@ pub fn drawSetPassword(
         dvui.spinner(
             @src(),
             .{
-                .color_text = .{ .r = 100, .g = 200, .b = 100 },
+                .color_text = .{ .color = .{ .r = 100, .g = 200, .b = 100 } },
                 .gravity_x = 0.5,
             },
         );
@@ -174,9 +174,9 @@ pub fn drawChangePassword(
     _ = paned;
 
     const local = struct {
-        var old_password: [64]u8 = .{0} ** 64;
-        var new_password: [64]u8 = .{0} ** 64;
-        var verify_new_password: [64]u8 = .{0} ** 64;
+        var old_password: [64]u8 = @splat(0);
+        var new_password: [64]u8 = @splat(0);
+        var verify_new_password: [64]u8 = @splat(0);
         var spinner_active: bool = false;
     };
 
@@ -306,7 +306,7 @@ pub fn drawChangePassword(
         dvui.spinner(
             @src(),
             .{
-                .color_text = .{ .r = 100, .g = 200, .b = 100 },
+                .color_text = .{ .color = .{ .r = 100, .g = 200, .b = 100 } },
                 .gravity_x = 0.5,
             },
         );

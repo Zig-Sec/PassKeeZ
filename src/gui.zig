@@ -100,7 +100,9 @@ pub fn AppInit(win: *dvui.Window) !void {
 }
 
 // Run as app is shutting down before dvui.Window.deinit()
-pub fn AppDeinit() void {
+pub fn AppDeinit(win: *dvui.Window) void {
+    _ = win;
+
     closeDevice(gpa);
     transport.reset(gpa);
 
@@ -117,7 +119,7 @@ pub fn frame() !dvui.App.Result {
         @src(),
         .{
             .scale = &dvui.currentWindow().content_scale,
-            .pinch_zoom = .global,
+            //.pinch_zoom = .global,
         },
         .{
             .rect = .cast(dvui.windowRect()),
@@ -769,7 +771,7 @@ fn list_available_devices(
         }
 
         if (s.len > 29) {
-            var buffer: [32]u8 = .{0} ** 32;
+            var buffer: [32]u8 = @splat(0);
             @memcpy(buffer[0..29], s[0..29]);
             @memcpy(buffer[29..], "...");
 

@@ -249,7 +249,7 @@ pub fn main(init: std.process.Init) !void {
         }
 
         // We read in usb packets with a size of 64 bytes.
-        var buffer: [64]u8 = .{0} ** 64;
+        var buffer: [64]u8 = @splat(0);
         if (u.read(&buffer)) |packet| {
             // Those packets are passed to the CTAPHID handler who assembles
             // them into a CTAPHID message.

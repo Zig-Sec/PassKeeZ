@@ -1,28 +1,28 @@
 .{
     .name = .passkeez,
-    .version = "0.8.0-alpha",
-    .minimum_zig_version = "0.16.0",
+    .version = "0.8.0",
+    .minimum_zig_version = "0.17.0",
     .fingerprint = 0xdd1692d15d21a6f6,
     .dependencies = .{
         .uuid = .{
-            .url = "https://codeberg.org/r4gus/uuid-zig/archive/0.5.0.tar.gz",
-            .hash = "uuid-0.5.0-oOieIQx-AABtc9U3ihv_bf9pZAYoKp4UMsNFHBr-cn-w",
+            .url = "https://codeberg.org/r4gus/uuid-zig/archive/0.7.0.tar.gz",
+            .hash = "uuid-0.7.0-oOieIcagAABw5U255XPVd__vLuCZetL_ZN18vPM86Yk4",
         },
         .kdbx = .{
-            .url = "https://codeberg.org/r4gus/kdbx/archive/0.5.2.tar.gz",
-            .hash = "kdbx-0.5.1-eJXZBC3ZCwCnA0j5k45FUpCXl38x2XQGKHfGb3YXpu1q",
+            .url = "git+https://codeberg.org/r4gus/kdbx#8330b13c845d1a6bb33a6627d672759a4796a592",
+            .hash = "kdbx-0.6.0-eJXZBJXbCwDJwCI0bvdFGkntZ0uCPpUUUZu1q9xZkD-x",
         },
         .keylib = .{
-            .url = "https://codeberg.org/r4gus/keylib/archive/0.10.2.tar.gz",
-            .hash = "keylib-0.10.2-mbYjkwfjCwA5w8dz0eZqMlOw6UxoR3h1mlnAj2UVVMxt",
+            .url = "git+https://codeberg.org/r4gus/keylib#5b3bed6e0e80a0dd1f9f16321c952f41a2128549",
+            .hash = "keylib-0.11.0-mbYjkz4hDAC-3slFfdmZj1qmbImYO-rOcchkgCIaph8U",
         },
         .dvui = .{
-            .url = "git+https://github.com/david-vanderson/dvui#3d2555337261743637f50375b2ac7bb1cf6b0510",
-            .hash = "dvui-0.5.0-dev-AQFJmV1i-gBHqte8mSi-IOJu02dp7b8ZNIDPKEpWMt7-",
+            .url = "git+https://github.com/david-vanderson/dvui#bed60d8693f510508a70675fb53d4c248fa16cac",
+            .hash = "dvui-0.6.0-dev-AQFJmbU4BAEhlnv12_C6RoFnnu4GDDe2O7ZRX2jaC1dG",
         },
         .nightwatch = .{
-            .url = "git+https://github.com/neurocyte/nightwatch#cbb9baab0d2ed66e9a0859e28c4a6a2e61a47600",
-            .hash = "nightwatch-1.0.0-uXzeHzCgAgBNSi0lpwYyPXdiSnZeiExDSiu_XdZO55HI",
+            .url = "git+https://codeberg.org/neurocyte/nightwatch#023e79f52bde36ac8fa4c967bd8333b14efb93cc",
+            .hash = "nightwatch-1.0.0-uXzeH1ALAwAr6LLM0H1Z0aBO_a5gpxQ1YsXpdlh3Xv6U",
         },
     },
     .paths = .{
