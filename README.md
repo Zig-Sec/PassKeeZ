@@ -62,7 +62,7 @@ sudo apt install passkeez
 | Version | Command |
 |:--------|:--------|
 | 0.6.3   | `sudo bash -c "$(curl -fsSL https://codeberg.org/r4gus/PassKeeZ/raw/branch/master/script/install-linux.sh)" install-linux.sh --vpasskeez 0.6.3 --vzig 0.15.2 --vzigenity 0.7.1`|
-| 0.7.4   | `sudo bash -c "$(curl -fsSL https://codeberg.org/r4gus/PassKeeZ/raw/branch/master/script/install-linux.sh)"` |
+| 0.8.0   | `sudo bash -c "$(curl -fsSL https://codeberg.org/r4gus/PassKeeZ/raw/branch/master/script/install-linux.sh)"` |
 
 You can find more info in the [Wiki](https://codeberg.org/r4gus/PassKeeZ/wiki).
 
