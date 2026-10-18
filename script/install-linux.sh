@@ -1,8 +1,8 @@
 #!/bin/bash
 
-PASSKEEZ_VERSION="0.7.4"
-ZIGENITY_VERSION="0.8.0"
-ZIG_VERSION="0.16.0"
+PASSKEEZ_VERSION="0.8.0"
+ZIGENITY_VERSION="0.9.0"
+ZIG_VERSION="0.17.0"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -113,19 +113,6 @@ function install_zigenity {
     cp zig-out/bin/zigenity /usr/local/bin/zigenity
 }
 
-function check_config_folder {
-    # This is where all configuration files will live
-    if [ ! -d /home/${SUDO_USER}/.passkeez ]; then
-        sudo -E -u $SUDO_USER mkdir /home/${SUDO_USER}/.passkeez
-        sudo chown ${SUDO_USER}:${SUDO_USER} /home/${SUDO_USER}/.passkeez
-    fi
-
-    if [ ! -e /home/${SUDO_USER}/.passkeez/config.json ]; then 
-        echo '{"db_path":"~/.passkeez/db.kdbx", "lang":"english"}' > /home/${SUDO_USER}/.passkeez/config.json
-        sudo chown ${SUDO_USER}:${SUDO_USER} /home/${SUDO_USER}/.passkeez/config.json
-    fi
-}
-
 function postinst {
     # Create a new (system) group called fido
     # - for explanation why a system group see: https://codeberg.org/r4gus/PassKeeZ/issues/21
@@ -231,10 +218,6 @@ if [ "$MODE" = "Installer" ]; then
 
     echo "Installing zigenity... "
     install_zigenity $zig "$dir"
-    echo -e "${GREEN}OK${NC}"
-
-    echo "Checking configuration folder... "
-    check_config_folder
     echo -e "${GREEN}OK${NC}"
 
     echo "Configuring... "
