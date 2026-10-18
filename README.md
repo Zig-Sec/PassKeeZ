@@ -95,16 +95,23 @@ You can find more info in the [Wiki](https://codeberg.org/r4gus/PassKeeZ/wiki).
 
 To get started please visit the [wiki](https://codeberg.org/r4gus/PassKeeZ/wiki/Installing-PassKeeZ).  
 
+On first startup, PassKeeZ creates `~/.passkeez/config.json` with the database
+path set to `~/.passkeez/db.kdbx`. When you first register or use a passkey, it
+offers to create that database and prompts you to choose a password. No manual
+configuration or database generation is required. Existing configurations with
+an empty `db_path` are updated to use this default; nonempty paths are preserved.
+
 ### Database Management
 
 - KDBX: You can manage your `.kdbx` database with [KeePassXC](https://keepassxc.org/) or KeePass.
+    - Use KDBX4 with Argon2d or Argon2id key derivation. KDBX3 and AES-KDF are not supported.
     - _We recommend making regular backups of your KDBX database._
 
 ### Configuring PassKeeZ
 
 PassKeeZ can be configured via `~/.passkeez/config.json` using the following options:
 
-- `"db_path"`: path to the .kdbx database. If the file doesn't exist, a new file will be created.
+- `"db_path"` (default: `"~/.passkeez/db.kdbx"`): path to the .kdbx database. If the file doesn't exist, PassKeeZ offers to create it on first use.
 - `"lang"`: the language of the application (currently supports `"english"` and `"german"`).
 - `"mlock"` (default: `false`): lock the memory using mlock. This will most likely require raising the limits in `/etc/security/limits.conf` to something like:
 ```

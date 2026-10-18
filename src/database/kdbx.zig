@@ -36,11 +36,14 @@ fn init(self: *TDatabase) TDatabase.Error!void {
         if (e == error.WouldBlock) {
             std.log.err("Cannot open database: ({any})", .{e});
             return error.WouldBlock;
-        } else { // FileNotFound
+        } else if (e == error.FileNotFound) {
             break :blk createDialog(self.allocator, self.io, self.path, self.home) catch |e2| {
                 std.log.err("Cannot open database: ({any})", .{e2});
                 return error.FileNotFound;
             };
+        } else {
+            std.log.err("Cannot open database: ({any})", .{e});
+            return error.FileError;
         }
     };
     defer file.close(self.io);
@@ -318,12 +321,6 @@ pub fn createDialog(allocator: std.mem.Allocator, io: std.Io, path: []const u8, 
                     continue :outer;
                 }
 
-                const f_db = misc.createFile(io, path, home) catch |e| {
-                    std.log.err("Cannot create new database file: {any}", .{e});
-                    return error.FileError;
-                };
-                errdefer f_db.close(io);
-
                 var database = kdbx.Database.new(allocator, io, .{
                     .generator = "PassKeeZ",
                     .name = "PassKeeZ Database",
@@ -360,6 +357,12 @@ pub fn createDialog(allocator: std.mem.Allocator, io: std.Io, path: []const u8, 
                     std.log.err("Cannot seal database: {any}", .{e});
                     return error.DatabaseError;
                 };
+
+                const f_db = misc.createFile(io, path, home) catch |e| {
+                    std.log.err("Cannot create new database file: {any}", .{e});
+                    return error.FileError;
+                };
+                errdefer f_db.close(io);
 
                 var writer = f_db.writer(io, &.{});
                 writer.interface.writeAll(raw.written()) catch |e| {

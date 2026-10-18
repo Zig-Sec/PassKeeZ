@@ -124,7 +124,7 @@ fn dbPathAlloc(a: std.mem.Allocator, home: []const u8, p: []const u8) ![]const u
         break :blk try std.fmt.allocPrint(
             a,
             "{s}/{s}",
-            .{ home, p },
+            .{ home, p[2..] },
         );
     } else if (p.len >= 1 and p[0] == '/') blk: {
         break :blk try a.dupe(u8, p);
@@ -158,13 +158,13 @@ pub fn authenticate(self: *@This(), a: std.mem.Allocator, io: std.Io) !void {
     var i: usize = 3;
 
     const f = misc.openFile(io, self.conf.db_path, self.home) catch |e| blk: {
-        if (e != error.WouldBlock) {
+        if (e == error.FileNotFound) {
             if (std.mem.containsAtLeast(u8, self.conf.db_path, 1, ".ccdb")) {
                 std.log.err("Databases of the format '.ccdb' are deprecated. Please check your config or use an earlier version of PassKeeZ.", .{});
                 return error.DeprecatedDatabaseFormat;
             } else if (std.mem.containsAtLeast(u8, self.conf.db_path, 1, ".kdbx")) {
                 break :blk Database.kdbx.createDialog(a, io, self.conf.db_path, self.home) catch |e_| {
-                    std.log.err("unable to create database '{s}' ({any})", .{ self.conf.db_path, e });
+                    std.log.err("unable to create database '{s}' ({any})", .{ self.conf.db_path, e_ });
                     return e_;
                 };
             } else {
@@ -172,7 +172,8 @@ pub fn authenticate(self: *@This(), a: std.mem.Allocator, io: std.Io) !void {
                 return error.InvalidDatabasePathOrName;
             }
         } else {
-            return error.WouldBlock;
+            std.log.err("unable to open database '{s}' ({any})", .{ self.conf.db_path, e });
+            return e;
         }
     };
     f.close(io);
