@@ -233,6 +233,7 @@ fn setCredential(
         if (data.user.name) |name| name.get() else "",
         data.user.id.get(),
         pem_key,
+        data.cred_random_with_uv,
     ) catch return TDatabase.Error.DatabaseError;
 
     // persist data
@@ -501,6 +502,20 @@ fn credentialFromEntry(
         allocator.free(cid);
     }
 
+    var prf_key: ?[32]u8 = if (entry.get("KPEX_PASSKEY_PRF")) |prf_key| blk: {
+        const len = try std.base64.url_safe_no_pad.Decoder.calcSizeForSlice(prf_key);
+        if (len != 32) {
+            std.log.err("decoding credential '{x}': expected prf key len of 32 but got '{d}'", .{ cid, len });
+            return error.PrfKeyDecoding;
+        }
+        var prf_key_: [32]u8 = @splat(0);
+        try std.base64.url_safe_no_pad.Decoder.decode(&prf_key_, prf_key);
+        break :blk prf_key_;
+    } else null;
+    errdefer if (prf_key) |*v| {
+        std.crypto.secureZero(u8, v);
+    };
+
     return .{
         .id = (try keylib.common.dt.ABS128B.fromSlice(cid)).?,
         .user = try keylib.common.User.new(uid, user_name, user_name),
@@ -509,8 +524,9 @@ fn credentialFromEntry(
         .key = k,
         .created = 0,
         .discoverable = true,
-        .policy = .userVerificationOptional,
+        .policy = .userVerificationRequired,
         .be = entry.getKpexBe(),
         .bs = entry.getKpexBs(),
+        .cred_random_with_uv = prf_key,
     };
 }
