@@ -84,6 +84,7 @@ You can find more info in the [Wiki](https://codeberg.org/r4gus/PassKeeZ/wiki).
 * Store your Passkeys (just a private key + related data) in a local, encrypted database.
 * Compatible with other KeePass applications, including [KeePassXC](https://keepassxc.org) and [KeePassDX](https://www.keepassdx.com)
 * Constant sign-counter, i.e. you can safely sync your credentials/passkeys between devices.
+* WebAuthn PRF extension support (test it [here](https://webauthn-passkeys-prf-demo.explore.corbado.com))
 
 > [!IMPORTANT]
 > With the release of version 0.5.0, PassKeeZ uses the KDBX format for storing credentials. The advantage of using KDBX is that you can manage your passkeys using KeePass or KeePassXC (PassKeeZ uses the same format for storing passkeys as KeePassXC). If you run into issues please open an issue.
