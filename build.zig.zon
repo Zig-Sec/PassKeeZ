@@ -1,7 +1,7 @@
 .{
     .name = .passkeez,
-    .version = "0.8.0",
-    .minimum_zig_version = "0.17.0",
+    .version = "0.8.1",
+    .minimum_zig_version = "0.17.1",
     .fingerprint = 0xdd1692d15d21a6f6,
     .dependencies = .{
         .uuid = .{
@@ -9,8 +9,8 @@
             .hash = "uuid-0.7.0-oOieIcagAABw5U255XPVd__vLuCZetL_ZN18vPM86Yk4",
         },
         .kdbx = .{
-            .url = "git+https://codeberg.org/r4gus/kdbx#8a9df159b845a45d57d7644f9e875ec0a6e474d6",
-            .hash = "kdbx-0.6.0-eJXZBBbdCwD149dkvTaBqcXb-HAFReLO5pYGuIK66xP1",
+            .url = "git+https://codeberg.org/r4gus/kdbx#01e003cfdf9f17e33ef2e6546d974d6d781e8c2f",
+            .hash = "kdbx-0.7.0-eJXZBOAIDAAKWZFecBnzLn3rKbobZuzBNXsNBBXFMyn_",
         },
         .keylib = .{
             .url = "git+https://codeberg.org/r4gus/keylib#5b3bed6e0e80a0dd1f9f16321c952f41a2128549",
