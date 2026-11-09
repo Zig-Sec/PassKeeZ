@@ -469,24 +469,45 @@ fn credentialFromEntry(
     const user_handle = entry.get("KPEX_PASSKEY_USER_HANDLE").?;
     const rp_id = entry.get("KPEX_PASSKEY_RELYING_PARTY").?;
 
-    var url_safe: bool = false;
-    var l = std.base64.standard.Decoder.calcSizeForSlice(user_handle) catch blk: {
-        const l = try std.base64.url_safe_no_pad.Decoder.calcSizeForSlice(user_handle);
-        url_safe = true;
-        break :blk l;
+    var uid: ?[]u8 = null;
+    defer {
+        if (uid) |uid_| {
+            std.crypto.secureZero(u8, uid_);
+            allocator.free(uid_);
+        }
+    }
+
+    var l = try std.base64.url_safe_no_pad.Decoder.calcSizeForSlice(user_handle);
+    uid = try allocator.alloc(u8, l);
+    std.base64.url_safe_no_pad.Decoder.decode(uid.?, user_handle) catch {
+        allocator.free(uid.?);
+        uid = null;
+
+        l = try std.base64.standard.Decoder.calcSizeForSlice(user_handle);
+        uid = try allocator.alloc(u8, l);
+        std.base64.standard.Decoder.decode(uid.?, user_handle) catch {
+            return error.UserHandleBase64DecodingFailed;
+        };
     };
 
-    const uid = try allocator.alloc(u8, l);
-    defer {
-        std.crypto.secureZero(u8, uid);
-        allocator.free(uid);
-    }
+    //var url_safe: bool = false;
+    //var l = std.base64.standard.Decoder.calcSizeForSlice(user_handle) catch blk: {
+    //    const l = try std.base64.url_safe_no_pad.Decoder.calcSizeForSlice(user_handle);
+    //    url_safe = true;
+    //    break :blk l;
+    //};
 
-    if (url_safe) {
-        try std.base64.url_safe_no_pad.Decoder.decode(uid, user_handle);
-    } else {
-        try std.base64.standard.Decoder.decode(uid, user_handle);
-    }
+    //const uid = try allocator.alloc(u8, l);
+    //defer {
+    //    std.crypto.secureZero(u8, uid);
+    //    allocator.free(uid);
+    //}
+
+    //if (url_safe) {
+    //    try std.base64.url_safe_no_pad.Decoder.decode(uid, user_handle);
+    //} else {
+    //    try std.base64.standard.Decoder.decode(uid, user_handle);
+    //}
 
     const @"2026-08-07 10:30 UTC (KDBX time)" = 63921655417;
 
@@ -521,7 +542,7 @@ fn credentialFromEntry(
 
     return .{
         .id = (try keylib.common.dt.ABS128B.fromSlice(cid)).?,
-        .user = try keylib.common.User.new(uid, user_name, user_name),
+        .user = try keylib.common.User.new(uid.?, user_name, user_name),
         .rp = try keylib.common.RelyingParty.new(rp_id, null),
         .sign_count = 0,
         .key = k,

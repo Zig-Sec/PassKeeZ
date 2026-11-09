@@ -9,8 +9,8 @@
             .hash = "uuid-0.7.0-oOieIcagAABw5U255XPVd__vLuCZetL_ZN18vPM86Yk4",
         },
         .kdbx = .{
-            .url = "git+https://codeberg.org/r4gus/kdbx#01e003cfdf9f17e33ef2e6546d974d6d781e8c2f",
-            .hash = "kdbx-0.7.0-eJXZBOAIDAAKWZFecBnzLn3rKbobZuzBNXsNBBXFMyn_",
+            .url = "git+https://codeberg.org/r4gus/kdbx#3d30dbfc8e3645eee937e1ffed1f731245b6d391",
+            .hash = "kdbx-0.7.0-eJXZBMIUDABoZVail-5E0n-BtWTSdT7iygyf1SycZh86",
         },
         .keylib = .{
             .url = "git+https://codeberg.org/r4gus/keylib#5b3bed6e0e80a0dd1f9f16321c952f41a2128549",
