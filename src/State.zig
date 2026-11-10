@@ -194,15 +194,17 @@ pub fn authenticate(self: *@This(), a: std.mem.Allocator, io: std.Io) !void {
             return e;
         };
         defer {
-            @memset(password.stdout, 0);
+            std.crypto.secureZero(u8, password.stdout);
             a.free(password.stdout);
-            @memset(password.stderr, 0);
+            std.crypto.secureZero(u8, password.stderr);
             a.free(password.stderr);
         }
         //std.debug.print("{any}", .{password});
 
         switch (password.term.exited) {
             0 => {
+                const pw = if (password.stdout.len == 0) "" else password.stdout[0 .. password.stdout.len - 1];
+
                 var db = if (std.mem.containsAtLeast(u8, self.conf.db_path, 1, ".ccdb")) {
                     std.log.err("unsupported database {s}", .{self.conf.db_path});
                     const r = std.process.run(a, io, .{
@@ -230,7 +232,7 @@ pub fn authenticate(self: *@This(), a: std.mem.Allocator, io: std.Io) !void {
                     break :blk Database.kdbx.Database(
                         self.conf.db_path,
                         self.home,
-                        password.stdout[0 .. password.stdout.len - 1],
+                        pw,
                         a,
                         io,
                     ) catch {
