@@ -305,13 +305,21 @@ fn doKeepAliveLoop(io: std.Io, cid: u32, u: *uhid.Uhid) !void {
     // CID (4) || CMD (1) || BCNTH (1) || BCNTL (1) || DATA
     var buffer: [8]u8 = undefined;
     std.mem.writeInt(u32, buffer[0..4], cid, .big);
-    buffer[4] = 0x3b; // CTAPHID_KEEPALIVE
+    buffer[4] = 0x3b | 0b10000000; // CTAPHID_KEEPALIVE
     buffer[5] = 0;
     buffer[6] = 1;
     buffer[7] = 1; // The authenticator is still processing the current request.
 
     while (true) {
-        try io.sleep(.fromMilliseconds(70), .awake);
+        try io.sleep(.fromMilliseconds(50), .awake);
+
+        var read_buffer: [64]u8 = @splat(0);
+        if (u.read(&read_buffer)) |packet| {
+            const cid2 = std.mem.readInt(u32, packet[0..4], .big);
+            std.log.debug("{x}", .{packet});
+            if (cid2 == cid) std.log.debug("cid: {d}", .{cid});
+            if (packet[4] & 0b0111111 == 0x11) std.log.warn("received CTAPHID_CANCEL from cid '{d}'", .{cid});
+        }
 
         try u.write(&buffer);
         std.log.debug("CTAPHID_KEEPALIVE", .{});
