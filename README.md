@@ -73,7 +73,7 @@ You can find more info in the [Wiki](https://codeberg.org/r4gus/PassKeeZ/wiki).
 |:-------:|:----------:|:-------------:|:-----:|
 | Cromium   | &#9989;    | 119.0.6045.159 (Official Build) Arch Linux (64-bit) | |
 | Brave | &#9989; | Version 1.62.153 Chromium: 121.0.6167.85 (Official Build) (64-bit) | |
-| Firefox | &#9989; | 122.0 (64-bit) |  |
+| Firefox/ Librewolf | &#9989; | 122.0 (64-bit) | Encountered issues with Librewolf version 159.0.1-1 on passkey.org and other test sites. Login etc. are aborted immediately.  |
 | Opera | &#9989; | version: 105.0.4970.16 chromium: 119.0.6045.159 | |
 
 > [!IMPORTANT]

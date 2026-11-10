@@ -263,7 +263,23 @@ pub fn main(init: std.process.Init) !void {
                     // it to the handle() function of our authenticator.
                     .cbor => {
                         var out: [7609]u8 = undefined;
-                        const r = auth.handle(&out, res.getData());
+
+                        var auth_future = init.io.async(
+                            keylib.ctap.authenticator.Auth.handle,
+                            .{
+                                &auth,
+                                &out,
+                                res.getData(),
+                            },
+                        );
+                        var keep_alive_future = init.io.async(
+                            doKeepAliveLoop,
+                            .{ init.io, res.cid, &u },
+                        );
+
+                        const r: []const u8 = auth_future.await(init.io);
+                        keep_alive_future.cancel(init.io) catch {};
+
                         @memcpy(res._data[0..r.len], r);
                         res.len = r.len;
                     },
@@ -282,6 +298,23 @@ pub fn main(init: std.process.Init) !void {
         }
 
         init.io.sleep(std.Io.Duration.fromMilliseconds(25), .real) catch {};
+    }
+}
+
+fn doKeepAliveLoop(io: std.Io, cid: u32, u: *uhid.Uhid) !void {
+    // CID (4) || CMD (1) || BCNTH (1) || BCNTL (1) || DATA
+    var buffer: [8]u8 = undefined;
+    std.mem.writeInt(u32, buffer[0..4], cid, .big);
+    buffer[4] = 0x3b; // CTAPHID_KEEPALIVE
+    buffer[5] = 0;
+    buffer[6] = 1;
+    buffer[7] = 1; // The authenticator is still processing the current request.
+
+    while (true) {
+        try io.sleep(.fromMilliseconds(70), .awake);
+
+        try u.write(&buffer);
+        std.log.debug("CTAPHID_KEEPALIVE", .{});
     }
 }
 
