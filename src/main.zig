@@ -303,7 +303,7 @@ pub fn main(init: std.process.Init) !void {
 
 fn doKeepAliveLoop(io: std.Io, cid: u32, u: *uhid.Uhid) !void {
     // CID (4) || CMD (1) || BCNTH (1) || BCNTL (1) || DATA
-    var buffer: [8]u8 = undefined;
+    var buffer: [64]u8 = undefined;
     std.mem.writeInt(u32, buffer[0..4], cid, .big);
     buffer[4] = 0x3b | 0b10000000; // CTAPHID_KEEPALIVE
     buffer[5] = 0;
